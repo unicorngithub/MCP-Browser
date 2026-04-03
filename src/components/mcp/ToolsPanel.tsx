@@ -1,6 +1,12 @@
 import { useMemo, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useAddressStore } from '@/stores/addressStore'
 import { useToolsStore } from '@/stores/toolsStore'
+import { ToolArgsForm } from '@/components/mcp/ToolArgsForm'
+import {
+  buildArgumentsFromForm,
+  initialFormValues,
+  parseMcpToolInputSchema,
+} from '@/lib/mcpInputSchema'
 
 function EmptyHint({ title, detail }: { title: string; detail?: string }) {
   return (
@@ -53,31 +59,57 @@ export function ToolsPanel() {
   const [copyDone, setCopyDone] = useState(false)
 
   const [toolArgsJson, setToolArgsJson] = useState('{}')
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [argsMode, setArgsMode] = useState<'form' | 'json'>('json')
   const [argsParseError, setArgsParseError] = useState<string | null>(null)
   const [callLoading, setCallLoading] = useState(false)
   const [callError, setCallError] = useState<string | null>(null)
   const [callResult, setCallResult] = useState<unknown>(null)
+  const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
+  const [toolTestOpen, setToolTestOpen] = useState(true)
+
+  const schemaFields = useMemo(
+    () => parseMcpToolInputSchema(selectedTool?.inputSchema),
+    [selectedTool],
+  )
 
   useEffect(() => {
     setToolArgsJson('{}')
+    setFormValues(initialFormValues(schemaFields))
+    setArgsMode(schemaFields.length > 0 ? 'form' : 'json')
     setArgsParseError(null)
     setCallError(null)
     setCallResult(null)
-  }, [selectedToolName])
+    setInputSchemaOpen(true)
+    setToolTestOpen(true)
+  }, [selectedToolName, schemaFields])
+
+  const setFormField = useCallback((key: string, value: string) => {
+    setFormValues((prev) => ({ ...prev, [key]: value }))
+  }, [])
 
   const runToolTest = useCallback(async () => {
     if (!selected?.url || !selectedTool) return
     let args: Record<string, unknown>
-    try {
-      const parsed: unknown = JSON.parse(toolArgsJson || '{}')
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        setArgsParseError('顶层须为 JSON 对象，例如 {} 或 {"key":"value"}')
+    if (argsMode === 'form' && schemaFields.length > 0) {
+      const built = buildArgumentsFromForm(schemaFields, formValues)
+      if (!built.ok) {
+        setArgsParseError(built.error)
         return
       }
-      args = parsed as Record<string, unknown>
-    } catch {
-      setArgsParseError('JSON 格式无效')
-      return
+      args = built.args
+    } else {
+      try {
+        const parsed: unknown = JSON.parse(toolArgsJson || '{}')
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          setArgsParseError('顶层须为 JSON 对象，例如 {} 或 {"key":"value"}')
+          return
+        }
+        args = parsed as Record<string, unknown>
+      } catch {
+        setArgsParseError('JSON 格式无效')
+        return
+      }
     }
     setArgsParseError(null)
     setCallError(null)
@@ -95,7 +127,7 @@ export function ToolsPanel() {
     } finally {
       setCallLoading(false)
     }
-  }, [selected?.url, selectedTool, toolArgsJson])
+  }, [selected?.url, selectedTool, toolArgsJson, argsMode, schemaFields, formValues])
 
   const statusLabel =
     connection === 'idle'
@@ -289,37 +321,168 @@ export function ToolsPanel() {
                     <p className="mt-2 text-sm leading-relaxed text-zinc-400">{selectedTool.description}</p>
                   ) : null}
                 </div>
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                    <span className="h-px w-8 shrink-0 bg-zinc-700" aria-hidden />
-                    inputSchema
-                  </h3>
-                  <pre className="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-900/60 p-4 text-xs leading-relaxed text-cyan-100/90 shadow-inner">
-                    {JSON.stringify(selectedTool.inputSchema ?? {}, null, 2)}
-                  </pre>
+                <div className="rounded-xl border border-white/[0.06] bg-zinc-950/30">
+                  <button
+                    type="button"
+                    onClick={() => setInputSchemaOpen((o) => !o)}
+                    aria-expanded={inputSchemaOpen}
+                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-300"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden
+                      className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform duration-200 ${
+                        inputSchemaOpen ? 'rotate-90' : ''
+                      }`}
+                    >
+                      <path d="M6 4l4 4-4 4V4z" />
+                    </svg>
+                    <span className="h-px w-6 shrink-0 bg-zinc-700" aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                      inputSchema
+                    </span>
+                    <span className="text-[10px] font-normal normal-case text-zinc-600">
+                      {inputSchemaOpen ? '点击收起' : '点击展开'}
+                    </span>
+                  </button>
+                  {inputSchemaOpen ? (
+                    <pre className="mx-1 mb-2 overflow-x-auto rounded-lg border border-white/[0.05] bg-zinc-900/60 p-4 text-xs leading-relaxed text-cyan-100/90 shadow-inner">
+                      {JSON.stringify(selectedTool.inputSchema ?? {}, null, 2)}
+                    </pre>
+                  ) : null}
                 </div>
 
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                    <span className="h-px w-8 shrink-0 bg-zinc-700" aria-hidden />
-                    工具测试
-                  </h3>
-                  <p className="mb-2 text-xs leading-relaxed text-zinc-500">
-                    编辑下方 JSON 作为 <span className="font-mono text-zinc-400">tools/call</span> 的{' '}
-                    <span className="font-mono text-zinc-400">arguments</span>，将单独建立会话并调用当前工具。
+                <div className="rounded-xl border border-white/[0.06] bg-zinc-950/30">
+                  <button
+                    type="button"
+                    onClick={() => setToolTestOpen((o) => !o)}
+                    aria-expanded={toolTestOpen}
+                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-300"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden
+                      className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform duration-200 ${
+                        toolTestOpen ? 'rotate-90' : ''
+                      }`}
+                    >
+                      <path d="M6 4l4 4-4 4V4z" />
+                    </svg>
+                    <span className="h-px w-6 shrink-0 bg-zinc-700" aria-hidden />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                      工具测试
+                    </span>
+                    <span className="text-[10px] font-normal normal-case text-zinc-600">
+                      {toolTestOpen ? '点击收起' : '点击展开'}
+                    </span>
+                  </button>
+                  {toolTestOpen ? (
+                    <div className="border-t border-white/[0.04] px-1 pb-2 pt-2">
+                  <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+                    按 <span className="font-mono text-zinc-400">inputSchema</span>（JSON Schema）生成表单，或直接编辑 JSON 作为{' '}
+                    <span className="font-mono text-zinc-400">tools/call</span> 的{' '}
+                    <span className="font-mono text-zinc-400">arguments</span>。
                   </p>
-                  <textarea
-                    value={toolArgsJson}
-                    onChange={(e) => {
-                      setToolArgsJson(e.target.value)
-                      setArgsParseError(null)
-                    }}
-                    spellCheck={false}
-                    rows={6}
-                    className="mb-2 w-full resize-y rounded-xl border border-white/[0.08] bg-zinc-900/80 px-3 py-2.5 font-mono text-xs leading-relaxed text-zinc-200 outline-none ring-cyan-500/30 placeholder:text-zinc-600 focus:border-cyan-500/35 focus:ring-2"
-                    placeholder='{"query": "..."}'
-                    aria-label="工具调用参数 JSON"
-                  />
+
+                  {schemaFields.length > 0 ? (
+                    <div
+                      className="mb-3 inline-flex rounded-lg border border-white/[0.08] bg-zinc-900/50 p-0.5"
+                      role="tablist"
+                      aria-label="参数编辑方式"
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={argsMode === 'form'}
+                        onClick={() => {
+                          setArgsParseError(null)
+                          try {
+                            const parsed: unknown = JSON.parse(toolArgsJson || '{}')
+                            if (
+                              parsed !== null &&
+                              typeof parsed === 'object' &&
+                              !Array.isArray(parsed)
+                            ) {
+                              const obj = parsed as Record<string, unknown>
+                              const next = initialFormValues(schemaFields)
+                              for (const f of schemaFields) {
+                                if (!(f.key in obj)) continue
+                                const v = obj[f.key]
+                                if (f.kind === 'json') {
+                                  next[f.key] = JSON.stringify(v, null, 2)
+                                } else if (f.kind === 'boolean') {
+                                  if (typeof v === 'boolean') next[f.key] = v ? 'true' : 'false'
+                                } else if (f.kind === 'enum') {
+                                  const s = String(v)
+                                  if (f.enumValues?.some((ev) => String(ev) === s)) next[f.key] = s
+                                } else if (f.kind === 'number' || f.kind === 'integer') {
+                                  next[f.key] = String(v)
+                                } else {
+                                  next[f.key] = v == null ? '' : String(v)
+                                }
+                              }
+                              setFormValues(next)
+                            }
+                          } catch {
+                            /* 保留当前表单 */
+                          }
+                          setArgsMode('form')
+                        }}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                          argsMode === 'form'
+                            ? 'bg-cyan-500/20 text-cyan-100'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        表单
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={argsMode === 'json'}
+                        onClick={() => {
+                          setArgsParseError(null)
+                          const built = buildArgumentsFromForm(schemaFields, formValues)
+                          if (built.ok) {
+                            setToolArgsJson(JSON.stringify(built.args, null, 2))
+                          }
+                          setArgsMode('json')
+                        }}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                          argsMode === 'json'
+                            ? 'bg-cyan-500/20 text-cyan-100'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mb-2 text-[11px] text-zinc-600">
+                      当前工具未声明 <span className="font-mono">properties</span>，请使用 JSON 编辑参数。
+                    </p>
+                  )}
+
+                  {argsMode === 'form' && schemaFields.length > 0 ? (
+                    <div className="mb-3 rounded-xl border border-white/[0.06] bg-zinc-900/40 p-4">
+                      <ToolArgsForm fields={schemaFields} values={formValues} onChange={setFormField} />
+                    </div>
+                  ) : (
+                    <textarea
+                      value={toolArgsJson}
+                      onChange={(e) => {
+                        setToolArgsJson(e.target.value)
+                        setArgsParseError(null)
+                      }}
+                      spellCheck={false}
+                      rows={6}
+                      className="mb-2 w-full resize-y rounded-xl border border-white/[0.08] bg-zinc-900/80 px-3 py-2.5 font-mono text-xs leading-relaxed text-zinc-200 outline-none ring-cyan-500/30 placeholder:text-zinc-600 focus:border-cyan-500/35 focus:ring-2"
+                      placeholder='{"query": "..."}'
+                      aria-label="工具调用参数 JSON"
+                    />
+                  )}
                   {argsParseError ? (
                     <p className="mb-2 text-xs text-amber-200/90">{argsParseError}</p>
                   ) : null}
@@ -357,6 +520,8 @@ export function ToolsPanel() {
                           }
                         })()}
                       </pre>
+                    </div>
+                  ) : null}
                     </div>
                   ) : null}
                 </div>
