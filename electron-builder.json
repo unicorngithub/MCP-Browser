@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.guos.mcpbrowser",
+  "productName": "MCP BROWSER",
+  "asar": true,
+  "directories": {
+    "output": "release/${version}",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist-electron",
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "icon": "build/icon.png",
+  "mac": {
+    "artifactName": "${productName}_${version}.${ext}",
+    "target": [
+      "dmg",
+      "zip"
+    ]
+  },
+  "win": {
+    "signAndEditExecutable": false,
+    "signDlls": false,
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "artifactName": "${productName}_${version}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false
+  }
+}

@@ -1,0 +1,14 @@
+Third-party notices
+===================
+
+Portions of this project are derived from the electron-vite-react template:
+https://github.com/electron-vite/electron-vite-react
+
+Copyright (c) 2023 草鞋没号
+
+Those portions are licensed under the MIT License. The permission and warranty
+terms are the same as in the LICENSE file in this repository; that file states
+the copyright for the work as a whole by Guo's and includes the full MIT text.
+
+When you redistribute this software, keep both LICENSE and this NOTICE with
+the distribution where applicable.
