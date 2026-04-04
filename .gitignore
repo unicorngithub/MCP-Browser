@@ -42,9 +42,8 @@ coverage
 *.sln
 *.sw?
 
-#lockfile
+# 若误用 npm/yarn 生成锁文件可忽略；pnpm-lock.yaml 需提交，供 CI 缓存与 --frozen-lockfile
 package-lock.json
-pnpm-lock.yaml
 yarn.lock
 /test-results/
 /playwright-report/
