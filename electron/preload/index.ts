@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   CallToolResult,
+  ExportServersJsonResult,
   FetchToolsResult,
+  ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
 } from '../../shared/types'
@@ -36,6 +38,19 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
     headers?: MCPHttpHeader[],
   ): Promise<CallToolResult> {
     return ipcRenderer.invoke('mcp:call-tool', url, toolName, args, headers ?? [])
+  },
+  exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult> {
+    return ipcRenderer.invoke('mcp:export-servers-json', opts ?? {})
+  },
+  importServersJson(): Promise<ImportServersJsonResult> {
+    return ipcRenderer.invoke('mcp:import-servers-json')
+  },
+  onServersBackupMenuAction(handler: (action: 'export' | 'import') => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, action: unknown) => {
+      if (action === 'export' || action === 'import') handler(action)
+    }
+    ipcRenderer.on('mcp-menu:servers-backup', wrap)
+    return () => ipcRenderer.removeListener('mcp-menu:servers-backup', wrap)
   },
 })
 

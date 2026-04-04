@@ -1,5 +1,13 @@
-import { ipcMain } from 'electron'
-import type { MCPHttpHeader, MCPServer } from '../../shared/types'
+import { randomUUID } from 'node:crypto'
+import { promises as fs } from 'node:fs'
+import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
+import { buildMcpServersExportPayload, parseMcpServersImportJson } from '../../shared/mcpServersJson'
+import type {
+  ExportServersJsonResult,
+  ImportServersJsonResult,
+  MCPHttpHeader,
+  MCPServer,
+} from '../../shared/types'
 import { getMcpServers, setMcpServers } from './mcpStore'
 import { callMcpTool, fetchMcpToolsList } from './mcpClient'
 
@@ -64,6 +72,74 @@ export function registerMcpIpc(): void {
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
         return { ok: false, error: message } as const
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'mcp:export-servers-json',
+    async (event, opts: unknown): Promise<ExportServersJsonResult> => {
+      try {
+        const redact =
+          opts !== null &&
+          typeof opts === 'object' &&
+          !Array.isArray(opts) &&
+          (opts as { redactHeaders?: unknown }).redactHeaders === true
+        const win = BrowserWindow.fromWebContents(event.sender)
+        const list = getMcpServers()
+        const payload = buildMcpServersExportPayload(list, redact)
+        const day = new Date().toISOString().slice(0, 10)
+        const saveOpts = {
+          title: '导出 MCP 地址配置',
+          defaultPath: `mcp-browser-servers-${day}.json`,
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        }
+        const { filePath, canceled } = win
+          ? await dialog.showSaveDialog(win, saveOpts)
+          : await dialog.showSaveDialog(saveOpts)
+        if (canceled || !filePath) {
+          return { ok: false, error: '已取消' }
+        }
+        await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+        return { ok: true }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        console.error('[mcp:export-servers-json]', e)
+        return { ok: false, error: message }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'mcp:import-servers-json',
+    async (event): Promise<ImportServersJsonResult> => {
+      try {
+        const win = BrowserWindow.fromWebContents(event.sender)
+        const openOpts: OpenDialogOptions = {
+          title: '导入 MCP 地址配置',
+          properties: ['openFile'],
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        }
+        const { filePaths, canceled } = win
+          ? await dialog.showOpenDialog(win, openOpts)
+          : await dialog.showOpenDialog(openOpts)
+        if (canceled || !filePaths?.[0]) {
+          return { ok: false, error: '已取消' }
+        }
+        const text = await fs.readFile(filePaths[0], 'utf8')
+        let json: unknown
+        try {
+          json = JSON.parse(text) as unknown
+        } catch {
+          return { ok: false, error: 'JSON 解析失败' }
+        }
+        const parsed = parseMcpServersImportJson(json, () => randomUUID())
+        if (!parsed.ok) return parsed
+        return { ok: true, servers: parsed.servers, count: parsed.servers.length }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        console.error('[mcp:import-servers-json]', e)
+        return { ok: false, error: message }
       }
     },
   )

@@ -2,7 +2,9 @@
 
 import type {
   CallToolResult,
+  ExportServersJsonResult,
   FetchToolsResult,
+  ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
 } from '../shared/types'
@@ -17,6 +19,9 @@ export interface McpDesktopApi {
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
   ): Promise<CallToolResult>
+  exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult>
+  importServersJson(): Promise<ImportServersJsonResult>
+  onServersBackupMenuAction(handler: (action: 'export' | 'import') => void): () => void
 }
 
 export interface UpdaterIpcApi {

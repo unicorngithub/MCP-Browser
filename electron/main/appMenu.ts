@@ -27,6 +27,12 @@ function showAbout(): void {
   })
 }
 
+/** 由菜单触发：通知当前窗口打开 MCP 配置导入/导出流程（渲染进程内对话框） */
+function sendMcpServersBackupMenuAction(action: 'export' | 'import'): void {
+  const w = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (w && !w.isDestroyed()) w.webContents.send('mcp-menu:servers-backup', action)
+}
+
 function showUsageTips(): void {
   const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const opts = {
@@ -34,7 +40,7 @@ function showUsageTips(): void {
     title: '使用说明',
     message: 'MCP BROWSER',
     detail:
-      '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
+      '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n菜单「文件」可导出/导入 MCP 配置 JSON（换机或备份）。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
     buttons: ['确定'],
     noLink: true,
   }
@@ -77,6 +83,15 @@ export function installAppMenu(): void {
     {
       label: '文件',
       submenu: [
+        {
+          label: '导出 MCP 配置…',
+          click: () => sendMcpServersBackupMenuAction('export'),
+        },
+        {
+          label: '导入 MCP 配置…',
+          click: () => sendMcpServersBackupMenuAction('import'),
+        },
+        { type: 'separator' },
         isMac
           ? { label: '关闭窗口', role: 'close', accelerator: 'Cmd+W' }
           : { label: '退出', role: 'quit', accelerator: 'Ctrl+Q' },

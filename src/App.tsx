@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ServerSidebar } from '@/components/mcp/ServerSidebar'
+import { McpServersImportExport } from '@/components/mcp/McpServersImportExport'
 import { ServerDialog } from '@/components/mcp/ServerDialog'
 import { ToolsPanel } from '@/components/mcp/ToolsPanel'
 import { useAddressStore } from '@/stores/addressStore'
@@ -64,6 +65,7 @@ export default function App() {
         onClose={() => setDialog(null)}
         onSave={onSave}
       />
+      <McpServersImportExport />
     </div>
   )
 }

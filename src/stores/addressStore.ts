@@ -10,6 +10,8 @@ interface AddressState {
   addServer: (name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   updateServer: (id: string, name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   removeServer: (id: string) => Promise<void>
+  /** 用导入列表完全替换本地端点（会持久化） */
+  replaceAllServers: (list: MCPServer[]) => Promise<void>
 }
 
 async function persist(list: MCPServer[]) {
@@ -81,5 +83,11 @@ export const useAddressStore = create<AddressState>((set, get) => ({
     await persist(next)
     const newSel = selectedId === id ? next[0]?.id ?? null : selectedId
     set({ servers: next, selectedId: newSel })
+  },
+
+  replaceAllServers: async (list) => {
+    const sorted = [...list].sort((a, b) => b.createdAt - a.createdAt)
+    await persist(sorted)
+    set({ servers: sorted, selectedId: sorted[0]?.id ?? null })
   },
 }))

@@ -71,3 +71,15 @@ export type FetchToolsResult =
 export type CallToolResult =
   | { ok: true; result: unknown }
   | { ok: false; error: string; diagnostics?: McpConnectDiagnostics }
+
+export type ExportServersJsonResult = { ok: true } | { ok: false; error: string }
+
+export type ImportServersJsonResult =
+  | { ok: true; servers: MCPServer[]; count: number }
+  | { ok: false; error: string }
+
+export type ExportServersJsonResult = { ok: true } | { ok: false; error: string }
+
+export type ImportServersJsonResult =
+  | { ok: true; servers: MCPServer[]; count: number }
+  | { ok: false; error: string }
