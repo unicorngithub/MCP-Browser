@@ -8,9 +8,10 @@ on:
     branches: [main, master, next]
   workflow_dispatch:
 
+# 同一分支多次 push：false = 排队跑完，避免误杀正在打的 Win/Mac 包；true = 只保留最新一次（省分钟数）
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   quality:
