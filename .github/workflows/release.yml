@@ -63,17 +63,14 @@ jobs:
           pattern: package-*
           merge-multiple: true
 
-      # 只上传成品安装包（与 blockmap），勿用 dist/**/*：会把 win-unpacked / .app 内上百个 .pak、dll 等全部挂到 Release。
+      # 只上传用户可下载的安装包（exe / dmg / zip）；勿用 dist/**/*：会把 win-unpacked / .app 内上百个文件挂到 Release。不接 electron-updater 差分更新则不必上传 .blockmap。
       - uses: softprops/action-gh-release@v2
         with:
           draft: false
           generate_release_notes: true
           files: |
             dist/**/MCP BROWSER_*.exe
-            dist/**/MCP BROWSER_*.exe.blockmap
             dist/**/MCP BROWSER_*.dmg
-            dist/**/MCP BROWSER_*.dmg.blockmap
             dist/**/MCP BROWSER_*.zip
-            dist/**/MCP BROWSER_*.zip.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
