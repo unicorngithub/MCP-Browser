@@ -10,6 +10,24 @@
 
 ---
 
+## 界面预览
+
+README 配图使用 **[MCP Feature Reference Server](https://example-server.modelcontextprotocol.io/)** 上的 **`https://example-server.modelcontextprotocol.io/debug/mcp`**（Debug MCP App，Streamable HTTP，**无需 OAuth**）。同一域名下的根路径 **`/mcp`** 可能需要鉴权，详见官网说明。
+
+<p align="center">
+  <img src="docs/images/app-window.png" alt="MCP BROWSER：主窗口侧栏与工具区" width="820" />
+</p>
+
+<p align="center"><em>主窗口：已连接官方 Debug 示例端点 — 左侧工具列表、右侧工具详情（说明、<code>inputSchema</code>、工具测试）。</em></p>
+
+<p align="center">
+  <img src="docs/images/app-add-server.png" alt="MCP BROWSER：添加 MCP 地址弹窗（含可选自定义请求头）" width="820" />
+</p>
+
+<p align="center"><em>添加 / 编辑端点；可配置 <code>Authorization</code> 等 HTTP 请求头。</em></p>
+
+---
+
 ## 功能概览
 
 - **多地址管理**：添加、编辑、删除 MCP HTTP 端点；使用 **electron-store** 本地持久化
@@ -58,6 +76,7 @@ pnpm rebuild   # 等同于 clean 后再 build
 
 ```text
 ├── build/             electron-builder 用应用图标（`icon.png`，以及生成的 `.ico` / `.icns`）
+├── docs/images/       README 截图（`app-window.png`、`app-add-server.png`；非 Linux 下可由 `pnpm test` 更新）
 ├── electron/          主进程、preload、IPC、MCP 客户端
 ├── public/            静态资源（favicon、`icon.png` 供窗口图标等）
 ├── scripts/           辅助脚本（如 `clean.mjs`）
@@ -76,7 +95,7 @@ pnpm rebuild   # 等同于 clean 后再 build
 | `pnpm run build:dir` | 类型检查 + Vite + 仅输出解包目录（`electron-builder --dir`） |
 | `pnpm clean` | 删除 `dist/`、`dist-electron/`、`release/`、`node_modules/.vite` |
 | `pnpm rebuild` | 先 `clean` 再执行 `pnpm build` |
-| `pnpm test` | Vitest（含 Electron 冒烟 E2E） |
+| `pnpm test` | Vitest（Electron E2E 会请求官方 **Debug MCP** 演示端点，需外网；Linux 下跳过） |
 | `pnpm preview` | 预览 Vite 构建后的渲染进程 |
 
 ## 安全说明

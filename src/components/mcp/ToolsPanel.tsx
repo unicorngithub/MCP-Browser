@@ -284,7 +284,7 @@ export function ToolsPanel() {
             ) : connection === 'ok' && tools.length === 0 ? (
               <EmptyHint title="暂无工具" detail="该端点未返回任何 tool" />
             ) : connection === 'ok' ? (
-              <ul className="flex flex-col gap-2">
+              <ul data-testid="mcp-tool-list" className="flex flex-col gap-2">
                 {tools.map((t) => {
                   const on = t.name === selectedToolName
                   return (

@@ -10,6 +10,24 @@ English | [简体中文](README.zh-CN.md)
 
 ---
 
+## Screenshots
+
+Documentation images are captured with **[MCP Feature Reference Server](https://example-server.modelcontextprotocol.io/)** — **`https://example-server.modelcontextprotocol.io/debug/mcp`** (Debug MCP App, Streamable HTTP, no OAuth). The root **`/mcp`** path on the same host may require authorization; see the official site for OAuth flows.
+
+<p align="center">
+  <img src="docs/images/app-window.png" alt="MCP BROWSER — main window: sidebar and tools panel" width="820" />
+</p>
+
+<p align="center"><em>Main window: connected to the official Debug MCP sample — tool list and a selected tool (name, description, <code>inputSchema</code>, tool test).</em></p>
+
+<p align="center">
+  <img src="docs/images/app-add-server.png" alt="MCP BROWSER — Add MCP server dialog with optional HTTP headers" width="820" />
+</p>
+
+<p align="center"><em>Add or edit an endpoint; optional custom headers (e.g. <code>Authorization</code>) for authenticated servers.</em></p>
+
+---
+
 ## Features
 
 - Save, edit, and delete MCP server URLs; persist with **electron-store**
@@ -58,6 +76,7 @@ If Electron fails to download or start under pnpm, ensure `package.json` include
 
 ```text
 ├── build/             App icons for electron-builder (`icon.png`, generated `.ico` / `.icns`)
+├── docs/images/       README screenshots (`app-window.png`, `app-add-server.png`; refreshed by `pnpm test` on non-Linux)
 ├── electron/          Main process, preload, IPC, MCP client
 ├── public/            Static assets (favicon, `icon.png` for the window in dev/prod)
 ├── scripts/           Helper scripts (e.g. `clean.mjs`)
@@ -76,7 +95,7 @@ If Electron fails to download or start under pnpm, ensure `package.json` include
 | `pnpm run build:dir` | `tsc` + Vite + `electron-builder --dir` (unpacked app only) |
 | `pnpm clean`      | Remove `dist/`, `dist-electron/`, `release/`, `node_modules/.vite` |
 | `pnpm rebuild`    | `pnpm clean` then `pnpm build` |
-| `pnpm test`       | Vitest (includes Electron e2e smoke) |
+| `pnpm test`       | Vitest (Electron e2e hits the official **Debug MCP** HTTP demo; needs network, skipped on Linux) |
 | `pnpm preview`    | Vite preview of the renderer build |
 
 ## Security notes

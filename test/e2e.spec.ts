@@ -16,7 +16,16 @@ import {
   test,
 } from 'vitest'
 
+/**
+ * 官方 MCP 托管示例之一：Debug MCP App（Streamable HTTP）。
+ * 根路径 `/mcp` 需 OAuth；`/debug/mcp` 在官方页面列出，可无 Token 演示 tools/list。
+ * @see https://example-server.modelcontextprotocol.io/
+ */
+const DEMO_MCP_HTTP_URL = 'https://example-server.modelcontextprotocol.io/debug/mcp'
+const DEMO_MCP_DISPLAY_NAME = 'Debug MCP（官方示例）'
+
 const root = path.join(__dirname, '..')
+const docsImagesDir = path.join(root, 'docs', 'images')
 let electronApp: ElectronApplication
 let page: Page
 let e2eUserDataDir: string
@@ -41,7 +50,9 @@ if (process.platform === 'linux') {
   })
 
   afterAll(async () => {
-    await page.screenshot({ path: 'test/screenshots/e2e.png' })
+    fs.mkdirSync(docsImagesDir, { recursive: true })
+    await page.screenshot({ path: path.join(root, 'test', 'screenshots', 'e2e.png') })
+    await page.screenshot({ path: path.join(docsImagesDir, 'app-add-server.png') })
     await page.close()
     await electronApp.close()
     fs.rmSync(e2eUserDataDir, { recursive: true, force: true })
@@ -53,15 +64,33 @@ if (process.platform === 'linux') {
       expect(title).eq('MCP BROWSER')
     })
 
-    test('主界面加载：工具区标题', async () => {
-      const h1 = await page.locator('[data-testid="mcp-tools-header"]')
-      const text = (await h1.textContent())?.trim()
-      expect(text).eq('选择 MCP 服务')
+    test(
+      '连接官方 Debug MCP 示例端点并拉取 tools/list',
+      async () => {
+        await page.getByRole('button', { name: /添加地址/ }).click()
+        await page.getByPlaceholder('例如：本地 MCP 服务').fill(DEMO_MCP_DISPLAY_NAME)
+        await page.getByPlaceholder('https://example.com/mcp').fill(DEMO_MCP_HTTP_URL)
+        await page.getByRole('button', { name: '保存' }).click()
+        const header = page.getByTestId('mcp-tools-header')
+        await header.waitFor({ state: 'visible', timeout: 15_000 })
+        await expect((await header.textContent())?.trim()).toContain(DEMO_MCP_DISPLAY_NAME)
+        await page.getByText('已连接').waitFor({ state: 'visible', timeout: 120_000 })
+        await page.getByText(/\d+\s*工具/).waitFor({ state: 'visible', timeout: 15_000 })
+      },
+      150_000,
+    )
+
+    test('主窗口截图：工具列表 + 选中工具详情', async () => {
+      const firstTool = page.getByTestId('mcp-tool-list').getByRole('button').first()
+      await firstTool.waitFor({ state: 'visible', timeout: 15_000 })
+      await firstTool.click()
+      await page.getByText('工具测试').waitFor({ state: 'visible', timeout: 25_000 })
+      fs.mkdirSync(docsImagesDir, { recursive: true })
+      await page.screenshot({ path: path.join(docsImagesDir, 'app-window.png') })
     })
 
     test('点击「添加地址」打开配置弹窗', async () => {
-      const addBtn = page.getByRole('button', { name: /添加地址/ })
-      await addBtn.click()
+      await page.getByRole('button', { name: /添加地址/ }).click()
       const dialogTitle = await page.getByRole('heading', { name: '添加 MCP 地址' }).textContent()
       expect(dialogTitle?.trim()).eq('添加 MCP 地址')
     })
