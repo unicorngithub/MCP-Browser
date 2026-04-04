@@ -77,9 +77,3 @@ export type ExportServersJsonResult = { ok: true } | { ok: false; error: string 
 export type ImportServersJsonResult =
   | { ok: true; servers: MCPServer[]; count: number }
   | { ok: false; error: string }
-
-export type ExportServersJsonResult = { ok: true } | { ok: false; error: string }
-
-export type ImportServersJsonResult =
-  | { ok: true; servers: MCPServer[]; count: number }
-  | { ok: false; error: string }

@@ -96,6 +96,10 @@ export function ToolsPanel() {
   const [callResult, setCallResult] = useState<unknown>(null)
   const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
   const [toolTestOpen, setToolTestOpen] = useState(true)
+  const [toolListQuery, setToolListQuery] = useState('')
+  const [toolListSearchField, setToolListSearchField] = useState<'name' | 'description' | 'both'>(
+    'name',
+  )
 
   const schemaFields = useMemo(
     () => parseMcpToolInputSchema(selectedTool?.inputSchema),
@@ -113,6 +117,31 @@ export function ToolsPanel() {
     setInputSchemaOpen(true)
     setToolTestOpen(true)
   }, [selectedToolName, schemaFields])
+
+  useEffect(() => {
+    setToolListQuery('')
+    setToolListSearchField('name')
+  }, [selectedId])
+
+  const filteredTools = useMemo(() => {
+    const q = toolListQuery.trim().toLowerCase()
+    if (!q) return tools
+    return tools.filter((t) => {
+      const inName = t.name.toLowerCase().includes(q)
+      if (toolListSearchField === 'name') return inName
+      const d = t.description?.toLowerCase() ?? ''
+      const inDesc = d.includes(q)
+      if (toolListSearchField === 'description') return inDesc
+      return inName || inDesc
+    })
+  }, [tools, toolListQuery, toolListSearchField])
+
+  const toolsListToRender = useMemo(() => {
+    const selected = tools.find((t) => t.name === selectedToolName)
+    if (!selected) return filteredTools
+    if (filteredTools.some((t) => t.name === selectedToolName)) return filteredTools
+    return [selected, ...filteredTools]
+  }, [tools, filteredTools, selectedToolName])
 
   const setFormField = useCallback((key: string, value: string) => {
     setFormValues((prev) => ({ ...prev, [key]: value }))
@@ -304,11 +333,61 @@ export function ToolsPanel() {
           <div className="flex h-10 shrink-0 items-center border-b border-white/[0.04] bg-zinc-950/40 px-4">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Tools</span>
             {connection === 'ok' && tools.length > 0 ? (
-              <span className="ml-2 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-400">
-                {tools.length}
+              <span
+                className="ml-2 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-400"
+                title={toolListQuery.trim() ? `筛选结果 / 共 ${tools.length} 个` : '工具总数'}
+              >
+                {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
               </span>
             ) : null}
           </div>
+          {connection === 'ok' && tools.length > 0 ? (
+            <div className="shrink-0 border-b border-white/[0.04] px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <label className="sr-only" htmlFor="mcp-tool-list-filter">
+                  搜索工具
+                </label>
+                <input
+                  id="mcp-tool-list-filter"
+                  type="search"
+                  value={toolListQuery}
+                  onChange={(e) => setToolListQuery(e.target.value)}
+                  placeholder={
+                    toolListSearchField === 'name'
+                      ? '搜索名称…'
+                      : toolListSearchField === 'description'
+                        ? '搜索说明…'
+                        : '搜索名称或说明…'
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-zinc-900/70 px-3 py-2 text-xs text-zinc-200 outline-none ring-cyan-500/25 placeholder:text-zinc-600 focus:border-cyan-500/35 focus:ring-2"
+                />
+                <label className="sr-only" htmlFor="mcp-tool-list-field">
+                  匹配范围
+                </label>
+                <select
+                  id="mcp-tool-list-field"
+                  value={toolListSearchField}
+                  onChange={(e) =>
+                    setToolListSearchField(e.target.value as 'name' | 'description' | 'both')
+                  }
+                  title="匹配范围"
+                  className="shrink-0 cursor-pointer rounded-lg border border-white/[0.08] bg-zinc-900/70 py-2 pl-2 pr-7 text-[11px] font-medium text-zinc-200 outline-none ring-cyan-500/25 focus:border-cyan-500/35 focus:ring-2"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.4rem center',
+                    appearance: 'none',
+                  }}
+                >
+                  <option value="name">名称</option>
+                  <option value="description">说明</option>
+                  <option value="both">名称&amp;说明</option>
+                </select>
+              </div>
+            </div>
+          ) : null}
           <div className="flex-1 overflow-y-auto p-3">
             {connection === 'loading' ? (
               <EmptyHint title="正在拉取 tools/list…" detail="按 MCP 规范完成握手与请求" />
@@ -317,31 +396,51 @@ export function ToolsPanel() {
             ) : connection === 'ok' && tools.length === 0 ? (
               <EmptyHint title="暂无工具" detail="该端点未返回任何 tool" />
             ) : connection === 'ok' ? (
-              <ul data-testid="mcp-tool-list" className="flex flex-col gap-2">
-                {tools.map((t) => {
-                  const on = t.name === selectedToolName
-                  return (
-                    <li key={t.name}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTool(t.name)}
-                        className={`w-full rounded-xl border px-3.5 py-3 text-left transition-all ${
-                          on
-                            ? 'border-cyan-500/35 bg-gradient-to-br from-cyan-500/10 to-transparent shadow-panel'
-                            : 'border-transparent bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900'
-                        }`}
-                      >
-                        <div className="font-medium text-zinc-100">{t.name}</div>
-                        {t.description ? (
-                          <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500">
-                            {t.description}
-                          </div>
-                        ) : null}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+              filteredTools.length === 0 ? (
+                <EmptyHint
+                  title="无匹配工具"
+                  detail={
+                    toolListQuery.trim()
+                      ? '可更换右侧匹配范围（名称 / 说明 / 名称&说明）或清空搜索框'
+                      : undefined
+                  }
+                />
+              ) : (
+                <ul data-testid="mcp-tool-list" className="flex flex-col gap-2">
+                  {toolsListToRender.map((t) => {
+                    const on = t.name === selectedToolName
+                    const pinned =
+                      toolListQuery.trim() &&
+                      selectedToolName === t.name &&
+                      !filteredTools.some((x) => x.name === t.name)
+                    return (
+                      <li key={t.name}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTool(t.name)}
+                          className={`w-full rounded-xl border px-3.5 py-3 text-left transition-all ${
+                            on
+                              ? 'border-cyan-500/35 bg-gradient-to-br from-cyan-500/10 to-transparent shadow-panel'
+                              : 'border-transparent bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900'
+                          }`}
+                        >
+                          {pinned ? (
+                            <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                              当前选中（不在筛选内）
+                            </div>
+                          ) : null}
+                          <div className="font-medium text-zinc-100">{t.name}</div>
+                          {t.description ? (
+                            <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500">
+                              {t.description}
+                            </div>
+                          ) : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )
             ) : null}
           </div>
         </section>
