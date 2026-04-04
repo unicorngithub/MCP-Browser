@@ -24,6 +24,8 @@ build/*.ico
 build/*.icns
 
 # Tooling / OS noise
+# Vite / vite-plugin-electron 加载 ts 配置时的临时产物（含本机路径）
+vite.config.ts.timestamp-*.mjs
 *.tsbuildinfo
 Thumbs.db
 Desktop.ini
