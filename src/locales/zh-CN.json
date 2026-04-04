@@ -7,7 +7,7 @@
   },
   "sidebar": {
     "title": "端点与工具",
-    "subtitle": "管理 MCP HTTP 端点与 tools 列表",
+    "subtitle": "管理 MCP HTTP 端点与工具列表",
     "addAddress": "添加地址",
     "saved": "已保存",
     "loadingConfig": "正在读取配置…",
@@ -80,7 +80,7 @@
     "refreshLoading": "刷新中…",
     "refresh": "刷新列表",
     "toolbarAria": "连接与操作",
-    "sectionTools": "Tools",
+    "sectionTools": "工具",
     "filterCountTitle": "筛选结果 / 共 {{total}} 个",
     "totalCountTitle": "工具总数",
     "searchLabel": "搜索工具",

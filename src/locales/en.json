@@ -7,7 +7,7 @@
   },
   "sidebar": {
     "title": "Endpoints & tools",
-    "subtitle": "Manage MCP HTTP endpoints and tool lists",
+    "subtitle": "Manage MCP HTTP endpoints & tools",
     "addAddress": "Add server",
     "saved": "Saved",
     "loadingConfig": "Loading configuration…",

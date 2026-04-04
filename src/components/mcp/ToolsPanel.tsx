@@ -354,26 +354,29 @@ export function ToolsPanel() {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1">
-        <section className="flex w-[min(100%,24rem)] shrink-0 flex-col border-r border-zinc-200/90 bg-white/50 dark:border-white/[0.06] dark:bg-zinc-950/30">
-          <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-4 dark:border-white/[0.04] dark:bg-zinc-950/40">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-              {t('tools.sectionTools')}
-            </span>
-            {connection === 'ok' && tools.length > 0 ? (
-              <span
-                className="ml-2 rounded bg-zinc-200/90 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
-                title={
-                  toolListQuery.trim()
-                    ? t('tools.filterCountTitle', { total: tools.length })
-                    : t('tools.totalCountTitle')
-                }
-              >
-                {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
+      {connection === 'error' ? (
+        <div className="min-h-0 flex-1 bg-zinc-100/90 dark:bg-zinc-950/40" aria-hidden />
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <section className="flex w-[min(100%,24rem)] shrink-0 flex-col border-r border-zinc-200/90 bg-white/50 dark:border-white/[0.06] dark:bg-zinc-950/30">
+            <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-4 dark:border-white/[0.04] dark:bg-zinc-950/40">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                {t('tools.sectionTools')}
               </span>
-            ) : null}
-          </div>
-          {connection === 'ok' && tools.length > 0 ? (
+              {connection === 'ok' && tools.length > 0 ? (
+                <span
+                  className="ml-2 rounded bg-zinc-200/90 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
+                  title={
+                    toolListQuery.trim()
+                      ? t('tools.filterCountTitle', { total: tools.length })
+                      : t('tools.totalCountTitle')
+                  }
+                >
+                  {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
+                </span>
+              ) : null}
+            </div>
+            {connection === 'ok' && tools.length > 0 ? (
             <div className="shrink-0 border-b border-zinc-200/80 px-3 py-2 dark:border-white/[0.04]">
               <div className="flex min-w-0 items-center gap-2">
                 <label className="sr-only" htmlFor="mcp-tool-list-filter">
@@ -420,7 +423,7 @@ export function ToolsPanel() {
               </div>
             </div>
           ) : null}
-          <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-3">
             {connection === 'loading' ? (
               <EmptyHint title={t('tools.emptyFetching')} detail={t('tools.emptyFetchingDetail')} />
             ) : !selected ? (
@@ -470,10 +473,10 @@ export function ToolsPanel() {
                 </ul>
               )
             ) : null}
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section className="min-w-0 flex-1 overflow-y-auto bg-zinc-50/50 dark:bg-zinc-950/20">
+          <section className="min-w-0 flex-1 overflow-y-auto bg-zinc-50/50 dark:bg-zinc-950/20">
           <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-6 dark:border-white/[0.04] dark:bg-zinc-950/40">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
               {t('tools.detailSection')}
@@ -711,7 +714,8 @@ export function ToolsPanel() {
             )}
           </div>
         </section>
-      </div>
+        </div>
+      )}
     </main>
   )
 }

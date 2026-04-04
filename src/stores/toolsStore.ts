@@ -16,7 +16,7 @@ interface ToolsState {
   clear: () => void
 }
 
-export const useToolsStore = create<ToolsState>((set) => ({
+export const useToolsStore = create<ToolsState>((set, get) => ({
   tools: [],
   connection: 'idle',
   error: null,
@@ -50,6 +50,8 @@ export const useToolsStore = create<ToolsState>((set) => ({
 
     try {
       const result = await window.mcpDesktop.fetchToolsList(url, headers)
+      if (get().lastUrl !== url) return
+
       if (!result.ok) {
         set({
           connection: 'error',
@@ -61,6 +63,7 @@ export const useToolsStore = create<ToolsState>((set) => ({
       }
       set({ connection: 'ok', tools: result.tools, error: null, connectDiagnostics: null })
     } catch (e) {
+      if (get().lastUrl !== url) return
       const message = e instanceof Error ? e.message : String(e)
       set({
         connection: 'error',
