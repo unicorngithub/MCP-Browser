@@ -57,13 +57,21 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # 先检出说明文档，再下载 artifact，避免工作区已有 dist/ 时 checkout 失败
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          sparse-checkout: |
+            docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md
+          sparse-checkout-cone-mode: false
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: package-*
           merge-multiple: true
 
-      # 只上传用户可下载的安装包（exe / dmg / zip）；勿用 dist/**/*：会把 win-unpacked / .app 内上百个文件挂到 Release。不接 electron-updater 差分更新则不必上传 .blockmap。
+      # 只上传：exe / dmg / zip + macOS 安装说明；勿用 dist/**/*（会带上 win-unpacked 等上百个文件）。
       - uses: softprops/action-gh-release@v2
         with:
           draft: false
@@ -72,5 +80,6 @@ jobs:
             dist/**/MCP BROWSER_*.exe
             dist/**/MCP BROWSER_*.dmg
             dist/**/MCP BROWSER_*.zip
+            docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
