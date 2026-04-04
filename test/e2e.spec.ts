@@ -26,6 +26,12 @@ const DEMO_MCP_DISPLAY_NAME = 'Debug MCP（官方示例）'
 
 const root = path.join(__dirname, '..')
 const docsImagesDir = path.join(root, 'docs', 'images')
+
+/** 仅在为 1/true 时写入 docs/images 与 test/screenshots（避免每次 pnpm test 改动配图） */
+const shouldUpdateScreenshots =
+  process.env.MCP_BROWSER_UPDATE_SCREENSHOTS === '1' ||
+  process.env.MCP_BROWSER_UPDATE_SCREENSHOTS === 'true'
+
 let electronApp: ElectronApplication
 let page: Page
 let e2eUserDataDir: string
@@ -50,9 +56,12 @@ if (process.platform === 'linux') {
   })
 
   afterAll(async () => {
-    fs.mkdirSync(docsImagesDir, { recursive: true })
-    await page.screenshot({ path: path.join(root, 'test', 'screenshots', 'e2e.png') })
-    await page.screenshot({ path: path.join(docsImagesDir, 'app-add-server.png') })
+    if (shouldUpdateScreenshots) {
+      fs.mkdirSync(path.join(root, 'test', 'screenshots'), { recursive: true })
+      fs.mkdirSync(docsImagesDir, { recursive: true })
+      await page.screenshot({ path: path.join(root, 'test', 'screenshots', 'e2e.png') })
+      await page.screenshot({ path: path.join(docsImagesDir, 'app-add-server.png') })
+    }
     await page.close()
     await electronApp.close()
     fs.rmSync(e2eUserDataDir, { recursive: true, force: true })
@@ -85,8 +94,10 @@ if (process.platform === 'linux') {
       await firstTool.waitFor({ state: 'visible', timeout: 15_000 })
       await firstTool.click()
       await page.getByText('工具测试').waitFor({ state: 'visible', timeout: 25_000 })
-      fs.mkdirSync(docsImagesDir, { recursive: true })
-      await page.screenshot({ path: path.join(docsImagesDir, 'app-window.png') })
+      if (shouldUpdateScreenshots) {
+        fs.mkdirSync(docsImagesDir, { recursive: true })
+        await page.screenshot({ path: path.join(docsImagesDir, 'app-window.png') })
+      }
     })
 
     test('点击「添加地址」打开配置弹窗', async () => {

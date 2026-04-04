@@ -76,7 +76,7 @@ pnpm rebuild   # 等同于 clean 后再 build
 
 ```text
 ├── build/             electron-builder 用应用图标（`icon.png`，以及生成的 `.ico` / `.icns`）
-├── docs/images/       README 截图（`app-window.png`、`app-add-server.png`；非 Linux 下可由 `pnpm test` 更新）
+├── docs/images/       README 截图（`app-window.png`、`app-add-server.png`；非 Linux 下用 `pnpm test:update-screenshots` 更新，普通 `pnpm test` 不会覆盖）
 ├── electron/          主进程、preload、IPC、MCP 客户端
 ├── public/            静态资源（favicon、`icon.png` 供窗口图标等）
 ├── scripts/           辅助脚本（如 `clean.mjs`）
@@ -95,7 +95,8 @@ pnpm rebuild   # 等同于 clean 后再 build
 | `pnpm run build:dir` | 类型检查 + Vite + 仅输出解包目录（`electron-builder --dir`） |
 | `pnpm clean` | 删除 `dist/`、`dist-electron/`、`release/`、`node_modules/.vite` |
 | `pnpm rebuild` | 先 `clean` 再执行 `pnpm build` |
-| `pnpm test` | Vitest（Electron E2E 会请求官方 **Debug MCP** 演示端点，需外网；Linux 下跳过） |
+| `pnpm test` | Vitest（E2E 会请求官方 **Debug MCP** 演示端点，需外网；Linux 下跳过；**不会**改写 README 配图） |
+| `pnpm test:update-screenshots` | 与测试流程相同，但会设置 `MCP_BROWSER_UPDATE_SCREENSHOTS=1`，刷新 `docs/images/*.png` 与 `test/screenshots/e2e.png` |
 | `pnpm preview` | 预览 Vite 构建后的渲染进程 |
 
 ## 安全说明

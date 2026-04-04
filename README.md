@@ -76,7 +76,7 @@ If Electron fails to download or start under pnpm, ensure `package.json` include
 
 ```text
 ├── build/             App icons for electron-builder (`icon.png`, generated `.ico` / `.icns`)
-├── docs/images/       README screenshots (`app-window.png`, `app-add-server.png`; refreshed by `pnpm test` on non-Linux)
+├── docs/images/       README screenshots (`app-window.png`, `app-add-server.png`; refresh with `pnpm test:update-screenshots` on non-Linux, not on every `pnpm test`)
 ├── electron/          Main process, preload, IPC, MCP client
 ├── public/            Static assets (favicon, `icon.png` for the window in dev/prod)
 ├── scripts/           Helper scripts (e.g. `clean.mjs`)
@@ -95,7 +95,8 @@ If Electron fails to download or start under pnpm, ensure `package.json` include
 | `pnpm run build:dir` | `tsc` + Vite + `electron-builder --dir` (unpacked app only) |
 | `pnpm clean`      | Remove `dist/`, `dist-electron/`, `release/`, `node_modules/.vite` |
 | `pnpm rebuild`    | `pnpm clean` then `pnpm build` |
-| `pnpm test`       | Vitest (Electron e2e hits the official **Debug MCP** HTTP demo; needs network, skipped on Linux) |
+| `pnpm test`       | Vitest (Electron e2e hits the official **Debug MCP** HTTP demo; needs network, skipped on Linux; does **not** overwrite README screenshots) |
+| `pnpm test:update-screenshots` | Same as test flow but sets `MCP_BROWSER_UPDATE_SCREENSHOTS=1` to refresh `docs/images/*.png` and `test/screenshots/e2e.png` |
 | `pnpm preview`    | Vite preview of the renderer build |
 
 ## Security notes

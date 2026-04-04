@@ -3,6 +3,8 @@ import type {
   FetchToolsResult,
   MCPHttpHeader,
   MCPTool,
+  McpConnectDiagnostics,
+  McpConnectStep,
 } from '../../shared/types'
 
 const CLIENT_NAME = 'mcp-browser'
@@ -132,7 +134,7 @@ async function sendInitializedNotification(
   sessionId: string | null,
   signal: AbortSignal,
   userHeaders: Record<string, string>,
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; status: number; detail: string }> {
   const res = await mcpPost(
     href,
     { jsonrpc: '2.0', method: 'notifications/initialized' },
@@ -140,30 +142,47 @@ async function sendInitializedNotification(
     signal,
     userHeaders,
   )
-  if (res.status === 202) return
-  if (res.ok && (res.status === 200 || res.status === 204)) return
+  if (res.status === 202) return { ok: true }
+  if (res.ok && (res.status === 200 || res.status === 204)) return { ok: true }
   const t = await res.text()
-  throw new Error(`notifications/initialized 失败 HTTP ${res.status}：${t.slice(0, 300)}`)
+  return { ok: false, status: res.status, detail: t.slice(0, 300) }
 }
 
 async function readRpcResult(
   res: Response,
   rpcId: number,
-): Promise<{ result?: unknown; error?: { message: string; code?: number }; httpError?: string }> {
+): Promise<{
+  status: number
+  result?: unknown
+  error?: { message: string; code?: number }
+  httpError?: string
+}> {
+  const status = res.status
   const raw = await res.text()
   const ct = res.headers.get('content-type') ?? ''
   const messages = extractJsonRpcMessages(ct, raw)
   const picked = pickByRpcId(messages, rpcId)
-  if (picked?.error) return { error: picked.error }
-  if (picked?.result !== undefined) return { result: picked.result }
+  if (picked?.error) return { status, error: picked.error }
+  if (picked?.result !== undefined) return { status, result: picked.result }
   if (!res.ok) {
     return {
+      status,
       httpError: `HTTP ${res.status}：${raw.slice(0, 400)}`,
     }
   }
   return {
+    status,
     httpError: `无法解析 JSON-RPC 响应（id=${rpcId}）：${raw.slice(0, 400)}`,
   }
+}
+
+function connDiag(
+  step: McpConnectStep,
+  httpStatus: number | null,
+  hadSessionId: boolean,
+  detail: string,
+): McpConnectDiagnostics {
+  return { step, httpStatus, hadSessionId, detail }
 }
 
 function shouldRetryInitializeWithOlderProtocol(errMsg: string, code?: number): boolean {
@@ -211,10 +230,12 @@ type OpenSessionOk = {
   sessionToClose: string | null
 }
 
+type OpenSessionFail = { ok: false; error: string; diagnostics: McpConnectDiagnostics }
+
 async function openMcpSession(
   href: string,
   userHeaders: Record<string, string>,
-): Promise<{ ok: true } & OpenSessionOk | { ok: false; error: string }> {
+): Promise<({ ok: true } & OpenSessionOk) | OpenSessionFail> {
   const signal = AbortSignal.timeout(60_000)
   let sessionId: string | null = null
   let sessionToClose: string | null = null
@@ -224,22 +245,32 @@ async function openMcpSession(
 
   for (let i = 0; i < protocolCandidates.length; i++) {
     const protocolVersion = protocolCandidates[i]
-    const initRes = await mcpPost(
-      href,
-      {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion,
-          capabilities: {},
-          clientInfo: { name: CLIENT_NAME, version: CLIENT_VERSION },
+    let initRes: Response
+    try {
+      initRes = await mcpPost(
+        href,
+        {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion,
+            capabilities: {},
+            clientInfo: { name: CLIENT_NAME, version: CLIENT_VERSION },
+          },
         },
-      },
-      null,
-      signal,
-      userHeaders,
-    )
+        null,
+        signal,
+        userHeaders,
+      )
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      return {
+        ok: false,
+        error: message,
+        diagnostics: connDiag('initialize', null, false, message),
+      }
+    }
 
     const sid = getSessionId(initRes)
     const initRead = await readRpcResult(initRes, 1)
@@ -252,11 +283,16 @@ async function openMcpSession(
       return {
         ok: false,
         error: `initialize 失败：${initRead.error.message}`,
+        diagnostics: connDiag('initialize', initRead.status, !!sid, initRead.error.message),
       }
     }
 
     if (initRead.httpError && !initRead.result) {
-      return { ok: false, error: initRead.httpError }
+      return {
+        ok: false,
+        error: initRead.httpError,
+        diagnostics: connDiag('initialize', initRead.status, !!sid, initRead.httpError),
+      }
     }
 
     sessionId = sid
@@ -266,14 +302,26 @@ async function openMcpSession(
   }
 
   if (!initialized) {
-    return { ok: false, error: 'initialize 未成功' }
+    return {
+      ok: false,
+      error: 'initialize 未成功',
+      diagnostics: connDiag(
+        'initialize',
+        null,
+        false,
+        '协议版本重试后仍未获得有效 initialize 结果',
+      ),
+    }
   }
 
-  try {
-    await sendInitializedNotification(href, sessionId, signal, userHeaders)
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return { ok: false, error: message }
+  const notif = await sendInitializedNotification(href, sessionId, signal, userHeaders)
+  if (!notif.ok) {
+    const hadSid = !!(sessionId && sessionId.length > 0)
+    return {
+      ok: false,
+      error: `notifications/initialized 失败 HTTP ${notif.status}：${notif.detail}`,
+      diagnostics: connDiag('notifications/initialized', notif.status, hadSid, notif.detail),
+    }
   }
 
   return { ok: true, href, sessionId, signal, sessionToClose }
@@ -289,32 +337,55 @@ export async function fetchMcpToolsList(
   const userHeaders = mcpHeadersToRecord(extraHeaders)
 
   const session = await openMcpSession(parsed.href, userHeaders)
-  if (!session.ok) return session
+  if (!session.ok) return { ok: false, error: session.error, diagnostics: session.diagnostics }
 
   const { href, sessionId, signal, sessionToClose } = session
+  const hadSidForList = !!(sessionId && sessionId.length > 0)
 
   try {
-    const listRes = await mcpPost(
-      href,
-      { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
-      sessionId,
-      signal,
-      userHeaders,
-    )
+    let listRes: Response
+    try {
+      listRes = await mcpPost(
+        href,
+        { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+        sessionId,
+        signal,
+        userHeaders,
+      )
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      return {
+        ok: false,
+        error: message,
+        diagnostics: connDiag('tools/list', null, hadSidForList, message),
+      }
+    }
 
     const listRead = await readRpcResult(listRes, 2)
     if (listRead.error) {
-      return { ok: false, error: `tools/list 失败：${listRead.error.message}` }
+      return {
+        ok: false,
+        error: `tools/list 失败：${listRead.error.message}`,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+      }
     }
     if (listRead.httpError && listRead.result === undefined) {
-      return { ok: false, error: listRead.httpError }
+      return {
+        ok: false,
+        error: listRead.httpError,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
+      }
     }
 
     const tools = normalizeTools(listRead.result)
     return { ok: true, tools }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return { ok: false, error: message }
+    return {
+      ok: false,
+      error: message,
+      diagnostics: connDiag('tools/list', null, hadSidForList, message),
+    }
   } finally {
     closeMcpSession(href, sessionToClose, userHeaders)
   }
@@ -335,35 +406,58 @@ export async function callMcpTool(
   const userHeaders = mcpHeadersToRecord(extraHeaders)
 
   const session = await openMcpSession(parsed.href, userHeaders)
-  if (!session.ok) return session
+  if (!session.ok) return { ok: false, error: session.error, diagnostics: session.diagnostics }
 
   const { href, sessionId, signal, sessionToClose } = session
+  const hadSidForCall = !!(sessionId && sessionId.length > 0)
 
   try {
-    const callRes = await mcpPost(
-      href,
-      {
-        jsonrpc: '2.0',
-        id: 3,
-        method: 'tools/call',
-        params: { name, arguments: args },
-      },
-      sessionId,
-      signal,
-      userHeaders,
-    )
+    let callRes: Response
+    try {
+      callRes = await mcpPost(
+        href,
+        {
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'tools/call',
+          params: { name, arguments: args },
+        },
+        sessionId,
+        signal,
+        userHeaders,
+      )
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      return {
+        ok: false,
+        error: message,
+        diagnostics: connDiag('tools/call', null, hadSidForCall, message),
+      }
+    }
 
     const callRead = await readRpcResult(callRes, 3)
     if (callRead.error) {
-      return { ok: false, error: `tools/call 失败：${callRead.error.message}` }
+      return {
+        ok: false,
+        error: `tools/call 失败：${callRead.error.message}`,
+        diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.error.message),
+      }
     }
     if (callRead.httpError && callRead.result === undefined) {
-      return { ok: false, error: callRead.httpError }
+      return {
+        ok: false,
+        error: callRead.httpError,
+        diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.httpError),
+      }
     }
     return { ok: true, result: callRead.result }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return { ok: false, error: message }
+    return {
+      ok: false,
+      error: message,
+      diagnostics: connDiag('tools/call', null, hadSidForCall, message),
+    }
   } finally {
     closeMcpSession(href, sessionToClose, userHeaders)
   }

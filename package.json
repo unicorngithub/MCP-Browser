@@ -26,7 +26,8 @@
     "build": "tsc && vite build && electron-builder",
     "preview": "vite preview",
     "pretest": "vite build --mode=test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:update-screenshots": "node scripts/test-update-screenshots.mjs"
   },
   "dependencies": {
     "electron-store": "^11.0.2",

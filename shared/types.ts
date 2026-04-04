@@ -45,11 +45,29 @@ export interface JsonRpcError {
   }
 }
 
+/** MCP HTTP 流程中的步骤（与服务端日志对照） */
+export type McpConnectStep =
+  | 'initialize'
+  | 'notifications/initialized'
+  | 'tools/list'
+  | 'tools/call'
+
+/** 连接 / 请求失败时的分步诊断 */
+export interface McpConnectDiagnostics {
+  step: McpConnectStep
+  /** 该步对应 HTTP 响应状态；尚未收到响应时为 null */
+  httpStatus: number | null
+  /** 该步请求所带或上一步响应是否已有 Mcp-Session-Id（initialize 响应头是否返回会话） */
+  hadSessionId: boolean
+  /** 简要说明（JSON-RPC message、响应体片段等） */
+  detail: string
+}
+
 export type FetchToolsResult =
   | { ok: true; tools: MCPTool[] }
-  | { ok: false; error: string }
+  | { ok: false; error: string; diagnostics?: McpConnectDiagnostics }
 
 /** tools/call 的返回（result 为服务端原始 JSON-RPC result） */
 export type CallToolResult =
   | { ok: true; result: unknown }
-  | { ok: false; error: string }
+  | { ok: false; error: string; diagnostics?: McpConnectDiagnostics }

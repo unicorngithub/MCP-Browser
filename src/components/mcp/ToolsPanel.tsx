@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, type ReactNode } from 'react'
+import type { McpConnectDiagnostics, McpConnectStep } from '@shared/types'
 import { useAddressStore } from '@/stores/addressStore'
 import { useToolsStore } from '@/stores/toolsStore'
 import { ToolArgsForm } from '@/components/mcp/ToolArgsForm'
@@ -34,6 +35,31 @@ function ToolbarIcon({
   )
 }
 
+function mcpSessionIdHint(step: McpConnectStep, had: boolean): string {
+  if (step === 'initialize') {
+    return had ? '是（initialize 响应头含 Mcp-Session-Id）' : '否（响应头未返回 Mcp-Session-Id）'
+  }
+  return had ? '是（本步请求已携带 Mcp-Session-Id）' : '否（无会话，请求未带 Mcp-Session-Id）'
+}
+
+function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
+  return (
+    <div className="mt-3 border-t border-red-500/20 pt-3 text-[11px] leading-relaxed text-red-100/85">
+      <div className="mb-1.5 font-semibold uppercase tracking-wider text-red-300/90">连接诊断</div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono">
+        <dt className="text-red-400/90">失败步骤</dt>
+        <dd>{d.step}</dd>
+        <dt className="text-red-400/90">HTTP 状态</dt>
+        <dd>{d.httpStatus === null ? '—（未收到响应，如超时/网络）' : d.httpStatus}</dd>
+        <dt className="text-red-400/90">Mcp-Session-Id</dt>
+        <dd>{mcpSessionIdHint(d.step, d.hadSessionId)}</dd>
+        <dt className="text-red-400/90">详情</dt>
+        <dd className="whitespace-pre-wrap break-all text-red-50/90">{d.detail}</dd>
+      </dl>
+    </div>
+  )
+}
+
 export function ToolsPanel() {
   const { servers, selectedId } = useAddressStore()
   const selected = useMemo(
@@ -45,6 +71,7 @@ export function ToolsPanel() {
     tools,
     connection,
     error,
+    connectDiagnostics,
     lastUrl,
     lastHeaders,
     selectedToolName,
@@ -65,6 +92,7 @@ export function ToolsPanel() {
   const [argsParseError, setArgsParseError] = useState<string | null>(null)
   const [callLoading, setCallLoading] = useState(false)
   const [callError, setCallError] = useState<string | null>(null)
+  const [callDiagnostics, setCallDiagnostics] = useState<McpConnectDiagnostics | null>(null)
   const [callResult, setCallResult] = useState<unknown>(null)
   const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
   const [toolTestOpen, setToolTestOpen] = useState(true)
@@ -80,6 +108,7 @@ export function ToolsPanel() {
     setArgsMode(schemaFields.length > 0 ? 'form' : 'json')
     setArgsParseError(null)
     setCallError(null)
+    setCallDiagnostics(null)
     setCallResult(null)
     setInputSchemaOpen(true)
     setToolTestOpen(true)
@@ -114,6 +143,7 @@ export function ToolsPanel() {
     }
     setArgsParseError(null)
     setCallError(null)
+    setCallDiagnostics(null)
     setCallResult(null)
     setCallLoading(true)
     try {
@@ -125,11 +155,13 @@ export function ToolsPanel() {
       )
       if (!out.ok) {
         setCallError(out.error)
+        setCallDiagnostics(out.diagnostics ?? null)
         return
       }
       setCallResult(out.result)
     } catch (e) {
       setCallError(e instanceof Error ? e.message : String(e))
+      setCallDiagnostics(null)
     } finally {
       setCallLoading(false)
     }
@@ -262,7 +294,8 @@ export function ToolsPanel() {
 
       {connection === 'error' && error ? (
         <div className="mx-4 mt-3 rounded-xl border border-red-500/25 bg-red-950/35 px-4 py-3 text-sm text-red-200/95 shadow-lg shadow-red-900/20 sm:mx-5">
-          {error}
+          <div className="whitespace-pre-wrap">{error}</div>
+          {connectDiagnostics ? <McpConnectDiagnosticsBlock d={connectDiagnostics} /> : null}
         </div>
       ) : null}
 
@@ -509,9 +542,10 @@ export function ToolsPanel() {
                     )}
                   </button>
                   {callError ? (
-                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-xl border border-red-500/25 bg-red-950/40 p-4 text-xs leading-relaxed text-red-100/95">
-                      {callError}
-                    </pre>
+                    <div className="mt-3 rounded-xl border border-red-500/25 bg-red-950/40 p-4 text-xs leading-relaxed text-red-100/95">
+                      <pre className="overflow-x-auto whitespace-pre-wrap">{callError}</pre>
+                      {callDiagnostics ? <McpConnectDiagnosticsBlock d={callDiagnostics} /> : null}
+                    </div>
                   ) : null}
                   {callResult !== null && !callError ? (
                     <div className="mt-3">
