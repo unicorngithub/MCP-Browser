@@ -14,7 +14,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
 
   return (
     <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-r border-zinc-200/80 bg-white/70 shadow-[inset_-1px_0_0_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.06] dark:bg-zinc-950/80 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
-      <div className="border-b border-zinc-200/80 px-4 pb-4 pt-5 dark:border-white/[0.06]">
+      <div className="border-b border-zinc-200/80 px-4 pb-4 pt-2 dark:border-white/[0.06]">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-600 dark:text-cyan-400/90">

@@ -18,13 +18,13 @@ Documentation images are captured with **[MCP Feature Reference Server](https://
   <img src="docs/images/app-window.png" alt="MCP BROWSER — main window: sidebar and tools panel" width="820" />
 </p>
 
-<p align="center"><em>Main window: connected to the official Debug MCP sample — tool list and a selected tool (name, description, <code>inputSchema</code>, tool test).</em></p>
+<p align="center"><em>Main window: default UI is Simplified Chinese (switch to English via the sidebar EN / 中文 control; the menu bar matches). Connected to the official Debug MCP sample — tool list and a selected tool (name, description, <code>inputSchema</code>, tool test).</em></p>
 
 <p align="center">
   <img src="docs/images/app-add-server.png" alt="MCP BROWSER — Add MCP server dialog with optional HTTP headers" width="820" />
 </p>
 
-<p align="center"><em>Add or edit an endpoint; optional custom headers (e.g. <code>Authorization</code>) for authenticated servers.</em></p>
+<p align="center"><em>Add or edit an endpoint; optional custom headers (e.g. <code>Authorization</code>) for authenticated servers (Chinese UI as shown).</em></p>
 
 ---
 
@@ -33,6 +33,7 @@ Documentation images are captured with **[MCP Feature Reference Server](https://
 - Save, edit, and delete MCP server URLs; persist with **electron-store**
 - **Streamable HTTP** client: `initialize` → session (`Mcp-Session-Id`) → `notifications/initialized` → `tools/list` (MCP spec–aligned)
 - Tool list and detail view (JSON `inputSchema`)
+- **UI i18n**: **English** and **简体中文** in the renderer (**react-i18next**); the **menu bar** and native import/export dialogs stay in sync via preload (`appLocale`) and main-process strings in `shared/appShellStrings.ts`
 - **React 18** + **TypeScript** + **Vite** + **Tailwind CSS** + **Zustand**
 
 ## Requirements
@@ -80,7 +81,7 @@ If Electron fails to download or start under pnpm, ensure `package.json` include
 ├── electron/          Main process, preload, IPC, MCP client
 ├── public/            Static assets (favicon, `icon.png` for the window in dev/prod)
 ├── scripts/           Helper scripts (e.g. `clean.mjs`)
-├── shared/            Shared TypeScript types
+├── shared/            Shared types, locale helpers, main-process UI strings (`appShellStrings.ts`, MCP IPC constants)
 ├── src/               React renderer (UI, stores)
 ├── dist/              Vite web build
 └── dist-electron/     Compiled Electron main + preload

@@ -18,13 +18,13 @@ README 配图使用 **[MCP Feature Reference Server](https://example-server.mode
   <img src="docs/images/app-window.png" alt="MCP BROWSER：主窗口侧栏与工具区" width="820" />
 </p>
 
-<p align="center"><em>主窗口：已连接官方 Debug 示例端点 — 左侧工具列表、右侧工具详情（说明、<code>inputSchema</code>、工具测试）。</em></p>
+<p align="center"><em>主窗口：界面默认<strong>简体中文</strong>，侧栏可切换 <strong>EN / 中文</strong>；菜单栏与系统文件对话框语言与界面一致。下图已连接官方 Debug 示例端点 — 左侧工具列表、右侧工具详情（说明、<code>inputSchema</code>、工具测试）。</em></p>
 
 <p align="center">
   <img src="docs/images/app-add-server.png" alt="MCP BROWSER：添加 MCP 地址弹窗（含可选自定义请求头）" width="820" />
 </p>
 
-<p align="center"><em>添加 / 编辑端点；可配置 <code>Authorization</code> 等 HTTP 请求头。</em></p>
+<p align="center"><em>添加 / 编辑端点；可配置 <code>Authorization</code> 等 HTTP 请求头（配图为中文界面）。</em></p>
 
 ---
 
@@ -33,6 +33,7 @@ README 配图使用 **[MCP Feature Reference Server](https://example-server.mode
 - **多地址管理**：添加、编辑、删除 MCP HTTP 端点；使用 **electron-store** 本地持久化
 - **协议对齐**：按 **Streamable HTTP** 流程发起 `initialize`、维护 **`Mcp-Session-Id` 会话**、发送 `notifications/initialized`，再请求 **`tools/list`**
 - **工具浏览**：列表 + 详情（含 `inputSchema` 格式化展示）
+- **中英界面**：渲染进程 **react-i18next**；侧栏切换语言后，**菜单栏**与导入/导出等**原生对话框**通过 preload（`appLocale`）与主进程 `shared/appShellStrings.ts` 同步文案
 - **技术栈**：React 18、TypeScript、Vite、Tailwind CSS、Zustand
 
 ## 环境要求
@@ -80,7 +81,7 @@ pnpm rebuild   # 等同于 clean 后再 build
 ├── electron/          主进程、preload、IPC、MCP 客户端
 ├── public/            静态资源（favicon、`icon.png` 供窗口图标等）
 ├── scripts/           辅助脚本（如 `clean.mjs`）
-├── shared/            前后端共享类型
+├── shared/            共享类型、语言与主进程菜单/对话框文案（`appShellStrings.ts`、MCP IPC 常量等）
 ├── src/               React 渲染进程（界面与状态）
 ├── dist/              Vite 前端构建产物
 └── dist-electron/     Electron 主进程与 preload 构建产物
