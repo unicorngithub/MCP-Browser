@@ -7,6 +7,7 @@ import type {
   MCPHttpHeader,
   MCPServer,
 } from '../../shared/types'
+import type { ThemePreference } from '../../shared/theme'
 
 /** 仅用于 electron-updater 模板组件的窄接口，不暴露完整 ipcRenderer */
 contextBridge.exposeInMainWorld('updaterIpc', {
@@ -51,6 +52,19 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
     }
     ipcRenderer.on('mcp-menu:servers-backup', wrap)
     return () => ipcRenderer.removeListener('mcp-menu:servers-backup', wrap)
+  },
+})
+
+contextBridge.exposeInMainWorld('appTheme', {
+  notifyPreferenceChanged(pref: ThemePreference) {
+    ipcRenderer.send('app:theme-preference-changed', pref)
+  },
+  onMenuSelect(handler: (pref: ThemePreference) => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, pref: unknown) => {
+      if (pref === 'light' || pref === 'dark' || pref === 'system') handler(pref)
+    }
+    ipcRenderer.on('app-menu:theme', wrap)
+    return () => ipcRenderer.removeListener('app-menu:theme', wrap)
   },
 })
 

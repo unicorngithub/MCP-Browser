@@ -12,11 +12,13 @@ import {
 function EmptyHint({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800/80 text-xl text-zinc-500">
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-200/90 text-xl text-zinc-500 dark:bg-zinc-800/80">
         ◇
       </div>
-      <p className="text-sm font-medium text-zinc-400">{title}</p>
-      {detail ? <p className="mt-2 max-w-xs text-xs leading-relaxed text-zinc-600">{detail}</p> : null}
+      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-400">{title}</p>
+      {detail ? (
+        <p className="mt-2 max-w-xs text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">{detail}</p>
+      ) : null}
     </div>
   )
 }
@@ -44,17 +46,19 @@ function mcpSessionIdHint(step: McpConnectStep, had: boolean): string {
 
 function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
   return (
-    <div className="mt-3 border-t border-red-500/20 pt-3 text-[11px] leading-relaxed text-red-100/85">
-      <div className="mb-1.5 font-semibold uppercase tracking-wider text-red-300/90">连接诊断</div>
+    <div className="mt-3 border-t border-red-300/50 pt-3 text-[11px] leading-relaxed text-red-900 dark:border-red-500/20 dark:text-red-100/85">
+      <div className="mb-1.5 font-semibold uppercase tracking-wider text-red-700 dark:text-red-300/90">
+        连接诊断
+      </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono">
-        <dt className="text-red-400/90">失败步骤</dt>
+        <dt className="text-red-700 dark:text-red-400/90">失败步骤</dt>
         <dd>{d.step}</dd>
-        <dt className="text-red-400/90">HTTP 状态</dt>
+        <dt className="text-red-700 dark:text-red-400/90">HTTP 状态</dt>
         <dd>{d.httpStatus === null ? '—（未收到响应，如超时/网络）' : d.httpStatus}</dd>
-        <dt className="text-red-400/90">Mcp-Session-Id</dt>
+        <dt className="text-red-700 dark:text-red-400/90">Mcp-Session-Id</dt>
         <dd>{mcpSessionIdHint(d.step, d.hadSessionId)}</dd>
-        <dt className="text-red-400/90">详情</dt>
-        <dd className="whitespace-pre-wrap break-all text-red-50/90">{d.detail}</dd>
+        <dt className="text-red-700 dark:text-red-400/90">详情</dt>
+        <dd className="whitespace-pre-wrap break-all text-red-950 dark:text-red-50/90">{d.detail}</dd>
       </dl>
     </div>
   )
@@ -212,7 +216,7 @@ export function ToolsPanel() {
         ? 'bg-red-400'
         : connection === 'loading'
           ? 'animate-pulse bg-amber-400'
-          : 'bg-zinc-500'
+          : 'bg-zinc-400 dark:bg-zinc-500'
 
   const retry = useCallback(() => {
     const u = selected?.url ?? lastUrl
@@ -234,13 +238,13 @@ export function ToolsPanel() {
   const showToolCount = Boolean(selected && connection === 'ok')
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col bg-zinc-950/40">
+    <main className="flex min-w-0 flex-1 flex-col bg-zinc-100/90 dark:bg-zinc-950/40">
       {/* 主工具栏 */}
-      <header className="flex min-h-[3.25rem] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/[0.06] bg-gradient-to-b from-zinc-900/50 to-zinc-950/80 px-4 py-2.5 backdrop-blur-md sm:px-5">
+      <header className="flex min-h-[3.25rem] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-zinc-200/90 bg-gradient-to-b from-white/90 to-zinc-100/95 px-4 py-2.5 backdrop-blur-md dark:border-white/[0.06] dark:from-zinc-900/50 dark:to-zinc-950/80 sm:px-5">
         <div className="min-w-0 flex-1 basis-[min(100%,14rem)]">
           <h1
             data-testid="mcp-tools-header"
-            className="truncate text-base font-semibold leading-tight tracking-tight text-white sm:text-lg"
+            className="truncate text-base font-semibold leading-tight tracking-tight text-zinc-900 dark:text-white sm:text-lg"
           >
             {selected ? selected.name : '选择 MCP 服务'}
           </h1>
@@ -249,7 +253,9 @@ export function ToolsPanel() {
               {selected.url}
             </p>
           ) : (
-            <p className="mt-0.5 text-[11px] text-zinc-600 sm:text-xs">在侧栏选择地址后在此查看工具</p>
+            <p className="mt-0.5 text-[11px] text-zinc-500 sm:text-xs dark:text-zinc-600">
+              在侧栏选择地址后在此查看工具
+            </p>
           )}
         </div>
 
@@ -260,7 +266,7 @@ export function ToolsPanel() {
         >
           {showToolCount ? (
             <span
-              className="order-first rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[11px] font-medium tabular-nums text-cyan-200/90 sm:order-none"
+              className="order-first rounded-md border border-cyan-500/35 bg-cyan-500/10 px-2 py-1 text-[11px] font-medium tabular-nums text-cyan-800 dark:border-cyan-500/20 dark:text-cyan-200/90 sm:order-none"
               title="当前端点返回的工具数量"
             >
               {tools.length} 工具
@@ -268,20 +274,24 @@ export function ToolsPanel() {
           ) : null}
 
           <div
-            className="hidden h-7 w-px bg-white/[0.08] sm:block"
+            className="hidden h-7 w-px bg-zinc-300/90 dark:bg-white/[0.08] sm:block"
             aria-hidden
             role="separator"
           />
 
           <div
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-zinc-950/60 px-2.5 py-1.5 sm:px-3"
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-200/90 bg-white/80 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-zinc-950/60 sm:px-3"
             title="与 MCP 服务端的连接状态"
           >
             <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot}`} aria-hidden />
-            <span className="text-xs font-medium text-zinc-200">{statusLabel}</span>
+            <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">{statusLabel}</span>
           </div>
 
-          <div className="hidden h-7 w-px bg-white/[0.08] sm:block" aria-hidden role="separator" />
+          <div
+            className="hidden h-7 w-px bg-zinc-300/90 dark:bg-white/[0.08] sm:block"
+            aria-hidden
+            role="separator"
+          />
 
           <div className="flex items-center gap-1.5">
             {selected?.url ? (
@@ -289,7 +299,7 @@ export function ToolsPanel() {
                 type="button"
                 onClick={() => void copyUrl()}
                 title="复制端点 URL"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700/90 bg-zinc-900/70 px-2.5 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-zinc-600 hover:bg-zinc-800 hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-700/90 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-white"
               >
                 <ToolbarIcon>
                   <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-3.5 w-3.5 opacity-80">
@@ -307,7 +317,7 @@ export function ToolsPanel() {
                 onClick={retry}
                 disabled={connection === 'loading'}
                 title={connection === 'loading' ? '正在请求…' : '重新执行 initialize 与 tools/list'}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-gradient-to-b from-cyan-500/15 to-teal-500/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:from-cyan-500/25 hover:to-teal-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-600/35 bg-gradient-to-b from-cyan-100/90 to-teal-50/80 px-2.5 py-1.5 text-xs font-semibold text-cyan-900 transition hover:border-cyan-500/50 hover:from-cyan-100 hover:to-teal-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-cyan-500/30 dark:from-cyan-500/15 dark:to-teal-500/10 dark:text-cyan-100 dark:hover:border-cyan-400/50 dark:hover:from-cyan-500/25 dark:hover:to-teal-500/15"
               >
                 <ToolbarIcon className={connection === 'loading' ? 'animate-spin' : ''}>
                   <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-3.5 w-3.5">
@@ -322,19 +332,19 @@ export function ToolsPanel() {
       </header>
 
       {connection === 'error' && error ? (
-        <div className="mx-4 mt-3 rounded-xl border border-red-500/25 bg-red-950/35 px-4 py-3 text-sm text-red-200/95 shadow-lg shadow-red-900/20 sm:mx-5">
+        <div className="mx-4 mt-3 rounded-xl border border-red-300/80 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-md sm:mx-5 dark:border-red-500/25 dark:bg-red-950/35 dark:text-red-200/95 dark:shadow-lg dark:shadow-red-900/20">
           <div className="whitespace-pre-wrap">{error}</div>
           {connectDiagnostics ? <McpConnectDiagnosticsBlock d={connectDiagnostics} /> : null}
         </div>
       ) : null}
 
       <div className="flex min-h-0 flex-1">
-        <section className="flex w-[min(100%,24rem)] shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/30">
-          <div className="flex h-10 shrink-0 items-center border-b border-white/[0.04] bg-zinc-950/40 px-4">
+        <section className="flex w-[min(100%,24rem)] shrink-0 flex-col border-r border-zinc-200/90 bg-white/50 dark:border-white/[0.06] dark:bg-zinc-950/30">
+          <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-4 dark:border-white/[0.04] dark:bg-zinc-950/40">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Tools</span>
             {connection === 'ok' && tools.length > 0 ? (
               <span
-                className="ml-2 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-400"
+                className="ml-2 rounded bg-zinc-200/90 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
                 title={toolListQuery.trim() ? `筛选结果 / 共 ${tools.length} 个` : '工具总数'}
               >
                 {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
@@ -342,7 +352,7 @@ export function ToolsPanel() {
             ) : null}
           </div>
           {connection === 'ok' && tools.length > 0 ? (
-            <div className="shrink-0 border-b border-white/[0.04] px-3 py-2">
+            <div className="shrink-0 border-b border-zinc-200/80 px-3 py-2 dark:border-white/[0.04]">
               <div className="flex min-w-0 items-center gap-2">
                 <label className="sr-only" htmlFor="mcp-tool-list-filter">
                   搜索工具
@@ -361,7 +371,7 @@ export function ToolsPanel() {
                   }
                   autoComplete="off"
                   spellCheck={false}
-                  className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-zinc-900/70 px-3 py-2 text-xs text-zinc-200 outline-none ring-cyan-500/25 placeholder:text-zinc-600 focus:border-cyan-500/35 focus:ring-2"
+                  className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none ring-cyan-500/25 placeholder:text-zinc-400 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-cyan-500/35"
                 />
                 <label className="sr-only" htmlFor="mcp-tool-list-field">
                   匹配范围
@@ -373,7 +383,7 @@ export function ToolsPanel() {
                     setToolListSearchField(e.target.value as 'name' | 'description' | 'both')
                   }
                   title="匹配范围"
-                  className="shrink-0 cursor-pointer rounded-lg border border-white/[0.08] bg-zinc-900/70 py-2 pl-2 pr-7 text-[11px] font-medium text-zinc-200 outline-none ring-cyan-500/25 focus:border-cyan-500/35 focus:ring-2"
+                  className="shrink-0 cursor-pointer rounded-lg border border-zinc-300 bg-white py-2 pl-2 pr-7 text-[11px] font-medium text-zinc-800 outline-none ring-cyan-500/25 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:text-zinc-200 dark:focus:border-cyan-500/35"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")`,
                     backgroundRepeat: 'no-repeat',
@@ -420,18 +430,18 @@ export function ToolsPanel() {
                           onClick={() => setSelectedTool(t.name)}
                           className={`w-full rounded-xl border px-3.5 py-3 text-left transition-all ${
                             on
-                              ? 'border-cyan-500/35 bg-gradient-to-br from-cyan-500/10 to-transparent shadow-panel'
-                              : 'border-transparent bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900'
+                              ? 'border-cyan-500/45 bg-gradient-to-br from-cyan-500/15 to-transparent shadow-sm dark:border-cyan-500/35 dark:from-cyan-500/10 dark:shadow-panel'
+                              : 'border-transparent bg-zinc-100/90 hover:border-zinc-300 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900'
                           }`}
                         >
                           {pinned ? (
-                            <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                            <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
                               当前选中（不在筛选内）
                             </div>
                           ) : null}
-                          <div className="font-medium text-zinc-100">{t.name}</div>
+                          <div className="font-medium text-zinc-900 dark:text-zinc-100">{t.name}</div>
                           {t.description ? (
-                            <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500">
+                            <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
                               {t.description}
                             </div>
                           ) : null}
@@ -445,9 +455,11 @@ export function ToolsPanel() {
           </div>
         </section>
 
-        <section className="min-w-0 flex-1 overflow-y-auto bg-zinc-950/20">
-          <div className="flex h-10 shrink-0 items-center border-b border-white/[0.04] bg-zinc-950/40 px-6">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">详情</span>
+        <section className="min-w-0 flex-1 overflow-y-auto bg-zinc-50/50 dark:bg-zinc-950/20">
+          <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-6 dark:border-white/[0.04] dark:bg-zinc-950/40">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
+              详情
+            </span>
           </div>
           <div className="p-6">
             {!selectedTool ? (
@@ -455,17 +467,21 @@ export function ToolsPanel() {
             ) : (
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-xl font-semibold tracking-tight text-white">{selectedTool.name}</h2>
+                  <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+                    {selectedTool.name}
+                  </h2>
                   {selectedTool.description ? (
-                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">{selectedTool.description}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                      {selectedTool.description}
+                    </p>
                   ) : null}
                 </div>
-                <div className="rounded-xl border border-white/[0.06] bg-zinc-950/30">
+                <div className="rounded-xl border border-zinc-200/90 bg-white/60 dark:border-white/[0.06] dark:bg-zinc-950/30">
                   <button
                     type="button"
                     onClick={() => setInputSchemaOpen((o) => !o)}
                     aria-expanded={inputSchemaOpen}
-                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-300"
+                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300"
                   >
                     <svg
                       viewBox="0 0 16 16"
@@ -477,27 +493,27 @@ export function ToolsPanel() {
                     >
                       <path d="M6 4l4 4-4 4V4z" />
                     </svg>
-                    <span className="h-px w-6 shrink-0 bg-zinc-700" aria-hidden />
+                    <span className="h-px w-6 shrink-0 bg-zinc-300 dark:bg-zinc-700" aria-hidden />
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                       inputSchema
                     </span>
-                    <span className="text-[10px] font-normal normal-case text-zinc-600">
+                    <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
                       {inputSchemaOpen ? '点击收起' : '点击展开'}
                     </span>
                   </button>
                   {inputSchemaOpen ? (
-                    <pre className="mx-1 mb-2 overflow-x-auto rounded-lg border border-white/[0.05] bg-zinc-900/60 p-4 text-xs leading-relaxed text-cyan-100/90 shadow-inner">
+                    <pre className="mx-1 mb-2 overflow-x-auto rounded-lg border border-zinc-200/80 bg-zinc-100/90 p-4 text-xs leading-relaxed text-cyan-900 shadow-inner dark:border-white/[0.05] dark:bg-zinc-900/60 dark:text-cyan-100/90">
                       {JSON.stringify(selectedTool.inputSchema ?? {}, null, 2)}
                     </pre>
                   ) : null}
                 </div>
 
-                <div className="rounded-xl border border-white/[0.06] bg-zinc-950/30">
+                <div className="rounded-xl border border-zinc-200/90 bg-white/60 dark:border-white/[0.06] dark:bg-zinc-950/30">
                   <button
                     type="button"
                     onClick={() => setToolTestOpen((o) => !o)}
                     aria-expanded={toolTestOpen}
-                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-300"
+                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300"
                   >
                     <svg
                       viewBox="0 0 16 16"
@@ -509,25 +525,26 @@ export function ToolsPanel() {
                     >
                       <path d="M6 4l4 4-4 4V4z" />
                     </svg>
-                    <span className="h-px w-6 shrink-0 bg-zinc-700" aria-hidden />
+                    <span className="h-px w-6 shrink-0 bg-zinc-300 dark:bg-zinc-700" aria-hidden />
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                       工具测试
                     </span>
-                    <span className="text-[10px] font-normal normal-case text-zinc-600">
+                    <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
                       {toolTestOpen ? '点击收起' : '点击展开'}
                     </span>
                   </button>
                   {toolTestOpen ? (
-                    <div className="border-t border-white/[0.04] px-1 pb-2 pt-2">
-                  <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-                    按 <span className="font-mono text-zinc-400">inputSchema</span>（JSON Schema）生成表单，或直接编辑 JSON 作为{' '}
-                    <span className="font-mono text-zinc-400">tools/call</span> 的{' '}
-                    <span className="font-mono text-zinc-400">arguments</span>。
+                    <div className="border-t border-zinc-200/80 px-1 pb-2 pt-2 dark:border-white/[0.04]">
+                  <p className="mb-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
+                    按 <span className="font-mono text-zinc-700 dark:text-zinc-400">inputSchema</span>
+                    （JSON Schema）生成表单，或直接编辑 JSON 作为{' '}
+                    <span className="font-mono text-zinc-700 dark:text-zinc-400">tools/call</span> 的{' '}
+                    <span className="font-mono text-zinc-700 dark:text-zinc-400">arguments</span>。
                   </p>
 
                   {schemaFields.length > 0 ? (
                     <div
-                      className="mb-3 inline-flex rounded-lg border border-white/[0.08] bg-zinc-900/50 p-0.5"
+                      className="mb-3 inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5 dark:border-white/[0.08] dark:bg-zinc-900/50"
                       role="tablist"
                       aria-label="参数编辑方式"
                     >
@@ -571,8 +588,8 @@ export function ToolsPanel() {
                         }}
                         className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                           argsMode === 'form'
-                            ? 'bg-cyan-500/20 text-cyan-100'
-                            : 'text-zinc-500 hover:text-zinc-300'
+                            ? 'bg-cyan-500/25 text-cyan-900 dark:bg-cyan-500/20 dark:text-cyan-100'
+                            : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-300'
                         }`}
                       >
                         表单
@@ -591,21 +608,21 @@ export function ToolsPanel() {
                         }}
                         className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                           argsMode === 'json'
-                            ? 'bg-cyan-500/20 text-cyan-100'
-                            : 'text-zinc-500 hover:text-zinc-300'
+                            ? 'bg-cyan-500/25 text-cyan-900 dark:bg-cyan-500/20 dark:text-cyan-100'
+                            : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-300'
                         }`}
                       >
                         JSON
                       </button>
                     </div>
                   ) : (
-                    <p className="mb-2 text-[11px] text-zinc-600">
+                    <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-600">
                       当前工具未声明 <span className="font-mono">properties</span>，请使用 JSON 编辑参数。
                     </p>
                   )}
 
                   {argsMode === 'form' && schemaFields.length > 0 ? (
-                    <div className="mb-3 rounded-xl border border-white/[0.06] bg-zinc-900/40 p-4">
+                    <div className="mb-3 rounded-xl border border-zinc-200/90 bg-zinc-50/90 p-4 dark:border-white/[0.06] dark:bg-zinc-900/40">
                       <ToolArgsForm fields={schemaFields} values={formValues} onChange={setFormField} />
                     </div>
                   ) : (
@@ -617,23 +634,23 @@ export function ToolsPanel() {
                       }}
                       spellCheck={false}
                       rows={6}
-                      className="mb-2 w-full resize-y rounded-xl border border-white/[0.08] bg-zinc-900/80 px-3 py-2.5 font-mono text-xs leading-relaxed text-zinc-200 outline-none ring-cyan-500/30 placeholder:text-zinc-600 focus:border-cyan-500/35 focus:ring-2"
+                      className="mb-2 w-full resize-y rounded-xl border border-zinc-300 bg-white px-3 py-2.5 font-mono text-xs leading-relaxed text-zinc-900 outline-none ring-cyan-500/30 placeholder:text-zinc-400 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/80 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-cyan-500/35"
                       placeholder='{"query": "..."}'
                       aria-label="工具调用参数 JSON"
                     />
                   )}
                   {argsParseError ? (
-                    <p className="mb-2 text-xs text-amber-200/90">{argsParseError}</p>
+                    <p className="mb-2 text-xs text-amber-800 dark:text-amber-200/90">{argsParseError}</p>
                   ) : null}
                   <button
                     type="button"
                     onClick={() => void runToolTest()}
                     disabled={callLoading || connection !== 'ok' || !selected?.url}
-                    className="inline-flex items-center gap-2 rounded-lg border border-teal-500/35 bg-gradient-to-b from-teal-500/15 to-emerald-500/10 px-3 py-2 text-xs font-semibold text-teal-100 transition hover:border-teal-400/45 hover:from-teal-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                    className="inline-flex items-center gap-2 rounded-lg border border-teal-600/40 bg-gradient-to-b from-teal-100/90 to-emerald-50/80 px-3 py-2 text-xs font-semibold text-teal-900 transition hover:border-teal-500/50 hover:from-teal-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-teal-500/35 dark:from-teal-500/15 dark:to-emerald-500/10 dark:text-teal-100 dark:hover:border-teal-400/45 dark:hover:from-teal-500/25"
                   >
                     {callLoading ? (
                       <>
-                        <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-200/30 border-t-teal-200" />
+                        <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-600/40 border-t-teal-700 dark:border-teal-200/30 dark:border-t-teal-200" />
                         调用中…
                       </>
                     ) : (
@@ -641,7 +658,7 @@ export function ToolsPanel() {
                     )}
                   </button>
                   {callError ? (
-                    <div className="mt-3 rounded-xl border border-red-500/25 bg-red-950/40 p-4 text-xs leading-relaxed text-red-100/95">
+                    <div className="mt-3 rounded-xl border border-red-300/80 bg-red-50 p-4 text-xs leading-relaxed text-red-900 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-100/95">
                       <pre className="overflow-x-auto whitespace-pre-wrap">{callError}</pre>
                       {callDiagnostics ? <McpConnectDiagnosticsBlock d={callDiagnostics} /> : null}
                     </div>
@@ -651,7 +668,7 @@ export function ToolsPanel() {
                       <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                         返回结果
                       </div>
-                      <pre className="max-h-[min(24rem,50vh)] overflow-auto rounded-xl border border-white/[0.06] bg-zinc-900/60 p-4 text-xs leading-relaxed text-emerald-100/90 shadow-inner">
+                      <pre className="max-h-[min(24rem,50vh)] overflow-auto rounded-xl border border-zinc-200/90 bg-emerald-50/80 p-4 text-xs leading-relaxed text-emerald-950 shadow-inner dark:border-white/[0.06] dark:bg-zinc-900/60 dark:text-emerald-100/90">
                         {(() => {
                           try {
                             return JSON.stringify(callResult, null, 2)

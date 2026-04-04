@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
   html,
   body,
   #root {
@@ -10,7 +17,7 @@
   }
 
   body {
-    @apply bg-zinc-950 text-zinc-100 antialiased;
+    @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 

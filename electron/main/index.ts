@@ -1,13 +1,21 @@
 import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import type { ThemePreference } from '../../shared/theme'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
 import { update } from './update'
 import { registerMcpIpc } from './ipcMcp'
-import { installAppMenu } from './appMenu'
+import { installAppMenu, syncNativeThemeSource } from './appMenu'
 
 registerMcpIpc()
+
+ipcMain.on('app:theme-preference-changed', (_, pref: unknown) => {
+  if (pref !== 'light' && pref !== 'dark' && pref !== 'system') return
+  const p = pref as ThemePreference
+  syncNativeThemeSource(p)
+  installAppMenu(p)
+})
 
 app.setName('MCP BROWSER')
 

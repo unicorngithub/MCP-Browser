@@ -1,5 +1,15 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
+import type { ThemePreference } from '../../shared/theme'
+
+export function syncNativeThemeSource(pref: ThemePreference): void {
+  nativeTheme.themeSource = pref === 'system' ? 'system' : pref
+}
+
+function sendThemeToRenderer(pref: ThemePreference): void {
+  const w = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (w && !w.isDestroyed()) w.webContents.send('app-menu:theme', pref)
+}
 
 /** MCP 公开规范文档（非商业推广，便于对照实现） */
 function openMcpSpecification(): void {
@@ -40,7 +50,7 @@ function showUsageTips(): void {
     title: '使用说明',
     message: 'MCP BROWSER',
     detail:
-      '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n菜单「文件」可导出/导入 MCP 配置 JSON（换机或备份）。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
+      '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n菜单「文件」可导出/导入 MCP 配置 JSON（换机或备份）。\n\n系统相关选项（如浅色 / 深色 / 跟随系统外观）在菜单栏「设置」中；后续其他系统配置也会放在此处。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
     buttons: ['确定'],
     noLink: true,
   }
@@ -51,9 +61,11 @@ function showUsageTips(): void {
 }
 
 /**
- * 应用菜单：文件 / 编辑 / 查看 / 窗口 / 帮助（macOS 首项为应用菜单）
+ * 应用菜单：文件 / 编辑 / 查看 / 设置 / 窗口 / 帮助（macOS 首项为应用菜单）
+ * 「设置」集中系统配置类项；后续新增优先放此菜单。
+ * @param themePref 与渲染进程 localStorage 同步，用于「设置 → 外观」单选项状态
  */
-export function installAppMenu(): void {
+export function installAppMenu(themePref: ThemePreference = 'system'): void {
   const isMac = process.platform === 'darwin'
 
   app.setAboutPanelOptions({
@@ -128,6 +140,46 @@ export function installAppMenu(): void {
         { label: '缩小', role: 'zoomOut', accelerator: 'CmdOrCtrl+-' },
         { type: 'separator' },
         { label: '全屏', role: 'togglefullscreen', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11' },
+      ],
+    },
+    {
+      label: '设置',
+      submenu: [
+        {
+          label: '外观',
+          submenu: [
+            {
+              label: '浅色',
+              type: 'radio',
+              checked: themePref === 'light',
+              click: () => {
+                syncNativeThemeSource('light')
+                installAppMenu('light')
+                sendThemeToRenderer('light')
+              },
+            },
+            {
+              label: '深色',
+              type: 'radio',
+              checked: themePref === 'dark',
+              click: () => {
+                syncNativeThemeSource('dark')
+                installAppMenu('dark')
+                sendThemeToRenderer('dark')
+              },
+            },
+            {
+              label: '跟随系统',
+              type: 'radio',
+              checked: themePref === 'system',
+              click: () => {
+                syncNativeThemeSource('system')
+                installAppMenu('system')
+                sendThemeToRenderer('system')
+              },
+            },
+          ],
+        },
       ],
     },
     {

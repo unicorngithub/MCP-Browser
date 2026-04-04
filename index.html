@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
+    <script>
+      (function () {
+        try {
+          var k = 'mcp-browser-theme'
+          var p = localStorage.getItem(k)
+          if (p !== 'light' && p !== 'dark' && p !== 'system') p = 'system'
+          var dark =
+            p === 'dark' ||
+            (p === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+          else document.documentElement.classList.remove('dark')
+        } catch (e) {}
+      })()
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/icon.png" sizes="512x512" />

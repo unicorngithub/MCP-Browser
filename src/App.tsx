@@ -42,9 +42,9 @@ export default function App() {
   )
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div
-        className="pointer-events-none absolute inset-0 opacity-40"
+        className="pointer-events-none absolute inset-0 opacity-30 dark:opacity-40"
         aria-hidden
         style={{
           background:

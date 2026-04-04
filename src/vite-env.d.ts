@@ -9,6 +9,13 @@ import type {
   MCPServer,
 } from '../shared/types'
 
+import type { ThemePreference } from '../shared/theme'
+
+export interface AppThemeApi {
+  notifyPreferenceChanged(pref: ThemePreference): void
+  onMenuSelect(handler: (pref: ThemePreference) => void): () => void
+}
+
 export interface McpDesktopApi {
   getServers(): Promise<MCPServer[]>
   setServers(list: MCPServer[]): Promise<void>
@@ -33,6 +40,7 @@ declare global {
   interface Window {
     mcpDesktop: McpDesktopApi
     updaterIpc: UpdaterIpcApi
+    appTheme?: AppThemeApi
   }
 }
 

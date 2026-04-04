@@ -1,7 +1,7 @@
 import type { ParsedField } from '@/lib/mcpInputSchema'
 
 const inputBase =
-  'w-full rounded-lg border border-zinc-700/80 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-cyan-500/25 transition focus:border-cyan-500/45 focus:ring-2'
+  'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-cyan-500/25 transition focus:border-cyan-500/50 focus:ring-2 dark:border-zinc-700/80 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-cyan-500/45'
 
 interface ToolArgsFormProps {
   fields: ParsedField[]
@@ -18,13 +18,13 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
         const label = f.title ?? f.key
         const id = `tool-arg-${f.key}`
         const hint = f.description ? (
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{f.description}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">{f.description}</p>
         ) : null
 
         if (f.kind === 'enum' && f.enumValues?.length) {
           return (
             <div key={f.key}>
-              <label htmlFor={id} className="block text-xs font-medium text-zinc-400">
+              <label htmlFor={id} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {label}
                 {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
               </label>
@@ -51,7 +51,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
         if (f.kind === 'boolean') {
           return (
             <div key={f.key}>
-              <label htmlFor={id} className="block text-xs font-medium text-zinc-400">
+              <label htmlFor={id} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {label}
                 {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
               </label>
@@ -73,10 +73,10 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
         if (f.kind === 'number' || f.kind === 'integer') {
           return (
             <div key={f.key}>
-              <label htmlFor={id} className="block text-xs font-medium text-zinc-400">
+              <label htmlFor={id} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {label}
                 {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
-                <span className="ml-2 font-mono text-[10px] font-normal text-zinc-600">
+                <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">
                   {f.kind === 'integer' ? 'integer' : 'number'}
                 </span>
               </label>
@@ -97,10 +97,10 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
         if (f.kind === 'json') {
           return (
             <div key={f.key}>
-              <label htmlFor={id} className="block text-xs font-medium text-zinc-400">
+              <label htmlFor={id} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {label}
                 {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
-                <span className="ml-2 font-mono text-[10px] font-normal text-zinc-600">JSON</span>
+                <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">JSON</span>
               </label>
               <textarea
                 id={id}
@@ -118,10 +118,12 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
 
         return (
           <div key={f.key}>
-            <label htmlFor={id} className="block text-xs font-medium text-zinc-400">
+            <label htmlFor={id} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
               {label}
               {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
-              <span className="ml-2 font-mono text-[10px] font-normal text-zinc-600">string</span>
+              <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">
+                string
+              </span>
             </label>
             <input
               id={id}

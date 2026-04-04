@@ -10,13 +10,13 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const { servers, selectedId, select, removeServer, ready } = useAddressStore()
 
   return (
-    <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/80 shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl">
-      <div className="border-b border-white/[0.06] px-4 pb-4 pt-5">
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-400/90">
+    <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-r border-zinc-200/80 bg-white/70 shadow-[inset_-1px_0_0_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.06] dark:bg-zinc-950/80 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
+      <div className="border-b border-zinc-200/80 px-4 pb-4 pt-5 dark:border-white/[0.06]">
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-600 dark:text-cyan-400/90">
           MCP BROWSER
         </div>
-        <h2 className="text-lg font-semibold tracking-tight text-white">端点与工具</h2>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-500">管理 MCP HTTP 端点与 tools 列表</p>
+        <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">端点与工具</h2>
+        <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">管理 MCP HTTP 端点与 tools 列表</p>
         <button
           type="button"
           onClick={onAdd}
@@ -28,18 +28,20 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
       </div>
 
       <div className="px-3 py-3">
-        <div className="px-1 text-[11px] font-medium uppercase tracking-wider text-zinc-600">已保存</div>
+        <div className="px-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
+          已保存
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-4">
         {!ready ? (
-          <div className="mx-1 rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 px-3 py-8 text-center text-sm text-zinc-500">
+          <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-100/80 px-3 py-8 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-500">
             正在读取配置…
           </div>
         ) : servers.length === 0 ? (
-          <div className="mx-1 rounded-xl border border-dashed border-zinc-800 bg-zinc-900/20 px-3 py-8 text-center">
-            <p className="text-sm text-zinc-400">还没有 MCP 地址</p>
-            <p className="mt-2 text-xs leading-relaxed text-zinc-600">点击上方按钮添加服务端 URL</p>
+          <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 px-3 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900/20">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">还没有 MCP 地址</p>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">点击上方按钮添加服务端 URL</p>
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -50,8 +52,8 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                   <div
                     className={`group relative overflow-hidden rounded-xl border transition-all ${
                       active
-                        ? 'border-cyan-500/40 bg-gradient-to-br from-cyan-500/10 to-teal-500/5 shadow-panel'
-                        : 'border-transparent bg-zinc-900/40 hover:border-zinc-700/80 hover:bg-zinc-900/70'
+                        ? 'border-cyan-500/50 bg-gradient-to-br from-cyan-500/15 to-teal-500/10 shadow-sm dark:border-cyan-500/40 dark:from-cyan-500/10 dark:to-teal-500/5 dark:shadow-panel'
+                        : 'border-transparent bg-zinc-100/90 hover:border-zinc-300 hover:bg-zinc-100 dark:bg-zinc-900/40 dark:hover:border-zinc-700/80 dark:hover:bg-zinc-900/70'
                     }`}
                   >
                     {active ? (
@@ -66,10 +68,10 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                         onClick={() => select(s.id)}
                         className="min-w-0 flex-1 px-3 py-2.5 text-left"
                       >
-                        <div className="truncate text-sm font-medium text-zinc-100">{s.name}</div>
+                        <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{s.name}</div>
                         <div className="mt-0.5 truncate font-mono text-[11px] text-zinc-500">{s.url}</div>
                       </button>
-                      <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l border-white/[0.04] py-1 pr-1 pl-0.5">
+                      <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l border-zinc-200/90 py-1 pr-1 pl-0.5 dark:border-white/[0.04]">
                         <button
                           type="button"
                           title="编辑"
@@ -77,7 +79,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                             e.stopPropagation()
                             onEdit(s)
                           }}
-                          className="rounded-md px-2 py-1 text-[11px] text-zinc-500 transition hover:bg-white/5 hover:text-cyan-400"
+                          className="rounded-md px-2 py-1 text-[11px] text-zinc-600 transition hover:bg-zinc-200/80 hover:text-cyan-600 dark:text-zinc-500 dark:hover:bg-white/5 dark:hover:text-cyan-400"
                         >
                           编辑
                         </button>
@@ -88,7 +90,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                             e.stopPropagation()
                             void removeServer(s.id)
                           }}
-                          className="rounded-md px-2 py-1 text-[11px] text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
+                          className="rounded-md px-2 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400"
                         >
                           删除
                         </button>
