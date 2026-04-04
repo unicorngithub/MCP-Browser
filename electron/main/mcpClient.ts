@@ -1,4 +1,9 @@
-import type { CallToolResult, FetchToolsResult, MCPTool } from '../../shared/types'
+import type {
+  CallToolResult,
+  FetchToolsResult,
+  MCPHttpHeader,
+  MCPTool,
+} from '../../shared/types'
 
 const CLIENT_NAME = 'mcp-browser'
 const CLIENT_VERSION = '0.1.0'
@@ -77,20 +82,46 @@ function getSessionId(res: Response): string | null {
   return res.headers.get('mcp-session-id') || res.headers.get('Mcp-Session-Id')
 }
 
+/** 将配置的 header 列表转为 fetch 用的字典（忽略空名称） */
+export function mcpHeadersToRecord(rows: MCPHttpHeader[] | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!rows?.length) return out
+  for (const { name, value } of rows) {
+    const n = typeof name === 'string' ? name.trim() : ''
+    if (!n) continue
+    out[n] = typeof value === 'string' ? value : String(value)
+  }
+  return out
+}
+
+function mergePostHeaders(
+  user: Record<string, string>,
+  sessionId: string | null,
+): Record<string, string> {
+  const h: Record<string, string> = { ...user }
+  h['Content-Type'] = 'application/json'
+  h.Accept = ACCEPT
+  if (sessionId) h['Mcp-Session-Id'] = sessionId
+  return h
+}
+
+function mergeDeleteHeaders(user: Record<string, string>, sessionToClose: string): Record<string, string> {
+  const h: Record<string, string> = { ...user }
+  h.Accept = ACCEPT
+  h['Mcp-Session-Id'] = sessionToClose
+  return h
+}
+
 async function mcpPost(
   href: string,
   body: unknown,
   sessionId: string | null,
   signal: AbortSignal,
+  userHeaders: Record<string, string>,
 ): Promise<Response> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: ACCEPT,
-  }
-  if (sessionId) headers['Mcp-Session-Id'] = sessionId
   return fetch(href, {
     method: 'POST',
-    headers,
+    headers: mergePostHeaders(userHeaders, sessionId),
     body: JSON.stringify(body),
     signal,
   })
@@ -100,12 +131,14 @@ async function sendInitializedNotification(
   href: string,
   sessionId: string | null,
   signal: AbortSignal,
+  userHeaders: Record<string, string>,
 ): Promise<void> {
   const res = await mcpPost(
     href,
     { jsonrpc: '2.0', method: 'notifications/initialized' },
     sessionId,
     signal,
+    userHeaders,
   )
   if (res.status === 202) return
   if (res.ok && (res.status === 200 || res.status === 204)) return
@@ -158,14 +191,15 @@ function parseMcpEndpoint(endpoint: string): { ok: true; href: string } | { ok: 
   return { ok: true, href: url.href }
 }
 
-function closeMcpSession(href: string, sessionToClose: string | null): void {
+function closeMcpSession(
+  href: string,
+  sessionToClose: string | null,
+  userHeaders: Record<string, string>,
+): void {
   if (!sessionToClose) return
   void fetch(href, {
     method: 'DELETE',
-    headers: {
-      Accept: ACCEPT,
-      'Mcp-Session-Id': sessionToClose,
-    },
+    headers: mergeDeleteHeaders(userHeaders, sessionToClose),
     signal: AbortSignal.timeout(8000),
   }).catch(() => {})
 }
@@ -177,9 +211,10 @@ type OpenSessionOk = {
   sessionToClose: string | null
 }
 
-async function openMcpSession(href: string): Promise<
-  { ok: true } & OpenSessionOk | { ok: false; error: string }
-> {
+async function openMcpSession(
+  href: string,
+  userHeaders: Record<string, string>,
+): Promise<{ ok: true } & OpenSessionOk | { ok: false; error: string }> {
   const signal = AbortSignal.timeout(60_000)
   let sessionId: string | null = null
   let sessionToClose: string | null = null
@@ -203,6 +238,7 @@ async function openMcpSession(href: string): Promise<
       },
       null,
       signal,
+      userHeaders,
     )
 
     const sid = getSessionId(initRes)
@@ -234,7 +270,7 @@ async function openMcpSession(href: string): Promise<
   }
 
   try {
-    await sendInitializedNotification(href, sessionId, signal)
+    await sendInitializedNotification(href, sessionId, signal, userHeaders)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -243,11 +279,16 @@ async function openMcpSession(href: string): Promise<
   return { ok: true, href, sessionId, signal, sessionToClose }
 }
 
-export async function fetchMcpToolsList(endpoint: string): Promise<FetchToolsResult> {
+export async function fetchMcpToolsList(
+  endpoint: string,
+  extraHeaders?: MCPHttpHeader[],
+): Promise<FetchToolsResult> {
   const parsed = parseMcpEndpoint(endpoint)
   if (!parsed.ok) return parsed
 
-  const session = await openMcpSession(parsed.href)
+  const userHeaders = mcpHeadersToRecord(extraHeaders)
+
+  const session = await openMcpSession(parsed.href, userHeaders)
   if (!session.ok) return session
 
   const { href, sessionId, signal, sessionToClose } = session
@@ -258,6 +299,7 @@ export async function fetchMcpToolsList(endpoint: string): Promise<FetchToolsRes
       { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
       sessionId,
       signal,
+      userHeaders,
     )
 
     const listRead = await readRpcResult(listRes, 2)
@@ -274,7 +316,7 @@ export async function fetchMcpToolsList(endpoint: string): Promise<FetchToolsRes
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
   } finally {
-    closeMcpSession(href, sessionToClose)
+    closeMcpSession(href, sessionToClose, userHeaders)
   }
 }
 
@@ -282,6 +324,7 @@ export async function callMcpTool(
   endpoint: string,
   toolName: string,
   args: Record<string, unknown>,
+  extraHeaders?: MCPHttpHeader[],
 ): Promise<CallToolResult> {
   const parsed = parseMcpEndpoint(endpoint)
   if (!parsed.ok) return parsed
@@ -289,7 +332,9 @@ export async function callMcpTool(
   const name = toolName.trim()
   if (!name) return { ok: false, error: '工具名称为空' }
 
-  const session = await openMcpSession(parsed.href)
+  const userHeaders = mcpHeadersToRecord(extraHeaders)
+
+  const session = await openMcpSession(parsed.href, userHeaders)
   if (!session.ok) return session
 
   const { href, sessionId, signal, sessionToClose } = session
@@ -305,6 +350,7 @@ export async function callMcpTool(
       },
       sessionId,
       signal,
+      userHeaders,
     )
 
     const callRead = await readRpcResult(callRes, 3)
@@ -319,6 +365,6 @@ export async function callMcpTool(
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
   } finally {
-    closeMcpSession(href, sessionToClose)
+    closeMcpSession(href, sessionToClose, userHeaders)
   }
 }

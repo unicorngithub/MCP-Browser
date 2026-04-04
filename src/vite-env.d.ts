@@ -1,12 +1,22 @@
 /// <reference types="vite/client" />
 
-import type { CallToolResult, FetchToolsResult, MCPServer } from '../shared/types'
+import type {
+  CallToolResult,
+  FetchToolsResult,
+  MCPHttpHeader,
+  MCPServer,
+} from '../shared/types'
 
 export interface McpDesktopApi {
   getServers(): Promise<MCPServer[]>
   setServers(list: MCPServer[]): Promise<void>
-  fetchToolsList(url: string): Promise<FetchToolsResult>
-  callTool(url: string, toolName: string, args: Record<string, unknown>): Promise<CallToolResult>
+  fetchToolsList(url: string, headers?: MCPHttpHeader[]): Promise<FetchToolsResult>
+  callTool(
+    url: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    headers?: MCPHttpHeader[],
+  ): Promise<CallToolResult>
 }
 
 export interface UpdaterIpcApi {

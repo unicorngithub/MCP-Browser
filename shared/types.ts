@@ -1,3 +1,9 @@
+/** 随 MCP HTTP 请求发送的自定义头（如 Authorization） */
+export interface MCPHttpHeader {
+  name: string
+  value: string
+}
+
 /** 本地持久化的 MCP 服务配置 */
 export interface MCPServer {
   id: string
@@ -5,6 +11,8 @@ export interface MCPServer {
   /** 完整 HTTP 端点（含路径），例如 https://host/mcp */
   url: string
   createdAt: number
+  /** 可选；对每个请求（含 initialize / tools / DELETE 会话）附加 */
+  headers?: MCPHttpHeader[]
 }
 
 /** MCP tools/list 返回的单个工具 */

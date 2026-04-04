@@ -46,6 +46,7 @@ export function ToolsPanel() {
     connection,
     error,
     lastUrl,
+    lastHeaders,
     selectedToolName,
     fetchForUrl,
     setSelectedTool,
@@ -116,7 +117,12 @@ export function ToolsPanel() {
     setCallResult(null)
     setCallLoading(true)
     try {
-      const out = await window.mcpDesktop.callTool(selected.url, selectedTool.name, args)
+      const out = await window.mcpDesktop.callTool(
+        selected.url,
+        selectedTool.name,
+        args,
+        selected.headers,
+      )
       if (!out.ok) {
         setCallError(out.error)
         return
@@ -127,7 +133,7 @@ export function ToolsPanel() {
     } finally {
       setCallLoading(false)
     }
-  }, [selected?.url, selectedTool, toolArgsJson, argsMode, schemaFields, formValues])
+  }, [selected?.url, selected?.headers, selectedTool, toolArgsJson, argsMode, schemaFields, formValues])
 
   const statusLabel =
     connection === 'idle'
@@ -149,8 +155,9 @@ export function ToolsPanel() {
 
   const retry = useCallback(() => {
     const u = selected?.url ?? lastUrl
-    if (u) void fetchForUrl(u)
-  }, [selected?.url, lastUrl, fetchForUrl])
+    const h = selected?.headers ?? lastHeaders
+    if (u) void fetchForUrl(u, h)
+  }, [selected?.url, selected?.headers, lastUrl, lastHeaders, fetchForUrl])
 
   const copyUrl = useCallback(async () => {
     if (!selected?.url) return

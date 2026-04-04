@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MCPTool } from '@shared/types'
+import type { MCPHttpHeader, MCPTool } from '@shared/types'
 
 type ConnState = 'idle' | 'loading' | 'ok' | 'error'
 
@@ -8,8 +8,9 @@ interface ToolsState {
   connection: ConnState
   error: string | null
   lastUrl: string | null
+  lastHeaders: MCPHttpHeader[] | undefined
   selectedToolName: string | null
-  fetchForUrl: (url: string | null) => Promise<void>
+  fetchForUrl: (url: string | null, headers?: MCPHttpHeader[]) => Promise<void>
   setSelectedTool: (name: string | null) => void
   clear: () => void
 }
@@ -19,24 +20,32 @@ export const useToolsStore = create<ToolsState>((set) => ({
   connection: 'idle',
   error: null,
   lastUrl: null,
+  lastHeaders: undefined,
   selectedToolName: null,
 
-  fetchForUrl: async (url) => {
+  fetchForUrl: async (url, headers) => {
     if (!url) {
       set({
         tools: [],
         connection: 'idle',
         error: null,
         lastUrl: null,
+        lastHeaders: undefined,
         selectedToolName: null,
       })
       return
     }
 
-    set({ connection: 'loading', error: null, lastUrl: url, selectedToolName: null })
+    set({
+      connection: 'loading',
+      error: null,
+      lastUrl: url,
+      lastHeaders: headers,
+      selectedToolName: null,
+    })
 
     try {
-      const result = await window.mcpDesktop.fetchToolsList(url)
+      const result = await window.mcpDesktop.fetchToolsList(url, headers)
       if (!result.ok) {
         set({ connection: 'error', error: result.error, tools: [] })
         return
@@ -56,6 +65,7 @@ export const useToolsStore = create<ToolsState>((set) => ({
       connection: 'idle',
       error: null,
       lastUrl: null,
+      lastHeaders: undefined,
       selectedToolName: null,
     }),
 }))

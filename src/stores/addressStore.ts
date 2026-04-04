@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MCPServer } from '@shared/types'
+import type { MCPHttpHeader, MCPServer } from '@shared/types'
 
 interface AddressState {
   servers: MCPServer[]
@@ -7,13 +7,20 @@ interface AddressState {
   ready: boolean
   hydrate: () => Promise<void>
   select: (id: string | null) => void
-  addServer: (name: string, url: string) => Promise<void>
-  updateServer: (id: string, name: string, url: string) => Promise<void>
+  addServer: (name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
+  updateServer: (id: string, name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   removeServer: (id: string) => Promise<void>
 }
 
 async function persist(list: MCPServer[]) {
   await window.mcpDesktop.setServers(list)
+}
+
+function normalizePersistedHeaders(headers: MCPHttpHeader[] | undefined): MCPHttpHeader[] {
+  if (!headers?.length) return []
+  return headers
+    .map((x) => ({ name: x.name.trim(), value: x.value }))
+    .filter((x) => x.name.length > 0)
 }
 
 export const useAddressStore = create<AddressState>((set, get) => ({
@@ -36,30 +43,34 @@ export const useAddressStore = create<AddressState>((set, get) => ({
 
   select: (id) => set({ selectedId: id }),
 
-  addServer: async (name, url) => {
+  addServer: async (name, url, headers) => {
     const trimmedUrl = url.trim()
+    const h = normalizePersistedHeaders(headers)
     const server: MCPServer = {
       id: crypto.randomUUID(),
       name: name.trim() || trimmedUrl,
       url: trimmedUrl,
       createdAt: Date.now(),
+      ...(h.length ? { headers: h } : {}),
     }
     const next = [server, ...get().servers]
     await persist(next)
     set({ servers: next, selectedId: server.id })
   },
 
-  updateServer: async (id, name, url) => {
+  updateServer: async (id, name, url, headers) => {
     const trimmedUrl = url.trim()
-    const next = get().servers.map(s =>
-      s.id === id
-        ? {
-            ...s,
-            name: name.trim() || trimmedUrl,
-            url: trimmedUrl,
-          }
-        : s,
-    )
+    const h = normalizePersistedHeaders(headers)
+    const next = get().servers.map(s => {
+      if (s.id !== id) return s
+      const { headers: _old, ...rest } = s
+      return {
+        ...rest,
+        name: name.trim() || trimmedUrl,
+        url: trimmedUrl,
+        ...(h.length ? { headers: h } : {}),
+      }
+    })
     await persist(next)
     set({ servers: next })
   },

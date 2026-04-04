@@ -4,7 +4,7 @@ import { ServerDialog } from '@/components/mcp/ServerDialog'
 import { ToolsPanel } from '@/components/mcp/ToolsPanel'
 import { useAddressStore } from '@/stores/addressStore'
 import { useToolsStore } from '@/stores/toolsStore'
-import type { MCPServer } from '@shared/types'
+import type { MCPHttpHeader, MCPServer } from '@shared/types'
 
 export default function App() {
   const hydrate = useAddressStore((s) => s.hydrate)
@@ -26,15 +26,15 @@ export default function App() {
   }, [hydrate])
 
   useEffect(() => {
-    void fetchForUrl(selected?.url ?? null)
-  }, [selected?.url, fetchForUrl])
+    void fetchForUrl(selected?.url ?? null, selected?.headers)
+  }, [selected, fetchForUrl])
 
   const onSave = useCallback(
-    async (name: string, url: string) => {
+    async (name: string, url: string, headers: MCPHttpHeader[]) => {
       if (dialog?.mode === 'edit' && dialog.server) {
-        await updateServer(dialog.server.id, name, url)
+        await updateServer(dialog.server.id, name, url, headers)
       } else {
-        await addServer(name, url)
+        await addServer(name, url, headers)
       }
     },
     [dialog, addServer, updateServer],

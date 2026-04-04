@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { CallToolResult, FetchToolsResult, MCPServer } from '../../shared/types'
+import type {
+  CallToolResult,
+  FetchToolsResult,
+  MCPHttpHeader,
+  MCPServer,
+} from '../../shared/types'
 
 /** 仅用于 electron-updater 模板组件的窄接口，不暴露完整 ipcRenderer */
 contextBridge.exposeInMainWorld('updaterIpc', {
@@ -21,11 +26,16 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
   setServers(list: MCPServer[]): Promise<void> {
     return ipcRenderer.invoke('mcp:set-servers', list)
   },
-  fetchToolsList(url: string): Promise<FetchToolsResult> {
-    return ipcRenderer.invoke('mcp:fetch-tools', url)
+  fetchToolsList(url: string, headers?: MCPHttpHeader[]): Promise<FetchToolsResult> {
+    return ipcRenderer.invoke('mcp:fetch-tools', url, headers ?? [])
   },
-  callTool(url: string, toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
-    return ipcRenderer.invoke('mcp:call-tool', url, toolName, args)
+  callTool(
+    url: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    headers?: MCPHttpHeader[],
+  ): Promise<CallToolResult> {
+    return ipcRenderer.invoke('mcp:call-tool', url, toolName, args, headers ?? [])
   },
 })
 
