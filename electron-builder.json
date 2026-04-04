@@ -3,6 +3,7 @@
   "appId": "com.guos.mcpbrowser",
   "productName": "MCP BROWSER",
   "asar": true,
+  "publish": null,
   "directories": {
     "output": "release/${version}",
     "buildResources": "build"

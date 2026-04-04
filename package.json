@@ -21,9 +21,9 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "rebuild": "pnpm clean && pnpm build",
-    "build:dir": "tsc && vite build && electron-builder --dir",
+    "build:dir": "tsc && vite build && electron-builder --dir --publish never",
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build && electron-builder --publish never",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "pretest": "vite build --mode=test",
