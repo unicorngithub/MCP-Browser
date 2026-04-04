@@ -32,6 +32,8 @@
   "dependencies": {
     "electron-store": "^11.0.2",
     "electron-updater": "^6.3.9",
+    "i18next": "^26.0.3",
+    "react-i18next": "^17.0.2",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

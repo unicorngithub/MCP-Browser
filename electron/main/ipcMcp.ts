@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
+import { getAppShellStrings } from '../../shared/appShellStrings'
+import { MCP_IPC_USER_CANCELLED } from '../../shared/mcpIpc'
 import { buildMcpServersExportPayload, parseMcpServersImportJson } from '../../shared/mcpServersJson'
 import type {
   ExportServersJsonResult,
@@ -8,6 +10,7 @@ import type {
   MCPHttpHeader,
   MCPServer,
 } from '../../shared/types'
+import { getMenuLanguage } from './appMenu'
 import { getMcpServers, setMcpServers } from './mcpStore'
 import { callMcpTool, fetchMcpToolsList } from './mcpClient'
 
@@ -89,16 +92,17 @@ export function registerMcpIpc(): void {
         const list = getMcpServers()
         const payload = buildMcpServersExportPayload(list, redact)
         const day = new Date().toISOString().slice(0, 10)
+        const shell = getAppShellStrings(getMenuLanguage())
         const saveOpts = {
-          title: '导出 MCP 地址配置',
+          title: shell.dialogExportServersTitle,
           defaultPath: `mcp-browser-servers-${day}.json`,
-          filters: [{ name: 'JSON', extensions: ['json'] }],
+          filters: [{ name: shell.dialogJsonFilters, extensions: ['json'] }],
         }
         const { filePath, canceled } = win
           ? await dialog.showSaveDialog(win, saveOpts)
           : await dialog.showSaveDialog(saveOpts)
         if (canceled || !filePath) {
-          return { ok: false, error: '已取消' }
+          return { ok: false, error: MCP_IPC_USER_CANCELLED }
         }
         await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
         return { ok: true }
@@ -115,23 +119,24 @@ export function registerMcpIpc(): void {
     async (event): Promise<ImportServersJsonResult> => {
       try {
         const win = BrowserWindow.fromWebContents(event.sender)
+        const shell = getAppShellStrings(getMenuLanguage())
         const openOpts: OpenDialogOptions = {
-          title: '导入 MCP 地址配置',
+          title: shell.dialogImportServersTitle,
           properties: ['openFile'],
-          filters: [{ name: 'JSON', extensions: ['json'] }],
+          filters: [{ name: shell.dialogJsonFilters, extensions: ['json'] }],
         }
         const { filePaths, canceled } = win
           ? await dialog.showOpenDialog(win, openOpts)
           : await dialog.showOpenDialog(openOpts)
         if (canceled || !filePaths?.[0]) {
-          return { ok: false, error: '已取消' }
+          return { ok: false, error: MCP_IPC_USER_CANCELLED }
         }
         const text = await fs.readFile(filePaths[0], 'utf8')
         let json: unknown
         try {
           json = JSON.parse(text) as unknown
         } catch {
-          return { ok: false, error: 'JSON 解析失败' }
+          return { ok: false, error: shell.dialogJsonParseFailed }
         }
         const parsed = parseMcpServersImportJson(json, () => randomUUID())
         if (!parsed.ok) return parsed

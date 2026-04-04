@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import type { MCPServer } from '@shared/types'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { useAddressStore } from '@/stores/addressStore'
 
 interface ServerSidebarProps {
@@ -7,41 +9,47 @@ interface ServerSidebarProps {
 }
 
 export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
+  const { t } = useTranslation()
   const { servers, selectedId, select, removeServer, ready } = useAddressStore()
 
   return (
     <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-r border-zinc-200/80 bg-white/70 shadow-[inset_-1px_0_0_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.06] dark:bg-zinc-950/80 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
       <div className="border-b border-zinc-200/80 px-4 pb-4 pt-5 dark:border-white/[0.06]">
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-600 dark:text-cyan-400/90">
-          MCP BROWSER
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-600 dark:text-cyan-400/90">
+              MCP BROWSER
+            </div>
+            <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">{t('sidebar.title')}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">{t('sidebar.subtitle')}</p>
+          </div>
+          <LanguageSwitcher />
         </div>
-        <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">端点与工具</h2>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">管理 MCP HTTP 端点与 tools 列表</p>
         <button
           type="button"
           onClick={onAdd}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 px-3 py-2.5 text-sm font-medium text-zinc-950 shadow-lg shadow-cyan-500/20 transition hover:brightness-110 active:scale-[0.98]"
         >
           <span className="text-lg leading-none">+</span>
-          添加地址
+          {t('sidebar.addAddress')}
         </button>
       </div>
 
       <div className="px-3 py-3">
         <div className="px-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
-          已保存
+          {t('sidebar.saved')}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-4">
         {!ready ? (
           <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-100/80 px-3 py-8 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-500">
-            正在读取配置…
+            {t('sidebar.loadingConfig')}
           </div>
         ) : servers.length === 0 ? (
           <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 px-3 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900/20">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">还没有 MCP 地址</p>
-            <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">点击上方按钮添加服务端 URL</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('sidebar.noAddresses')}</p>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">{t('sidebar.noAddressesHint')}</p>
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -74,25 +82,25 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                       <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l border-zinc-200/90 py-1 pr-1 pl-0.5 dark:border-white/[0.04]">
                         <button
                           type="button"
-                          title="编辑"
+                          title={t('sidebar.editTitle')}
                           onClick={(e) => {
                             e.stopPropagation()
                             onEdit(s)
                           }}
                           className="rounded-md px-2 py-1 text-[11px] text-zinc-600 transition hover:bg-zinc-200/80 hover:text-cyan-600 dark:text-zinc-500 dark:hover:bg-white/5 dark:hover:text-cyan-400"
                         >
-                          编辑
+                          {t('sidebar.edit')}
                         </button>
                         <button
                           type="button"
-                          title="删除"
+                          title={t('sidebar.deleteTitle')}
                           onClick={(e) => {
                             e.stopPropagation()
                             void removeServer(s.id)
                           }}
                           className="rounded-md px-2 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400"
                         >
-                          删除
+                          {t('sidebar.delete')}
                         </button>
                       </div>
                     </div>

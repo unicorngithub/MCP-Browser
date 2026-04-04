@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { ParsedField } from '@/lib/mcpInputSchema'
 
 const inputBase =
@@ -10,6 +11,7 @@ interface ToolArgsFormProps {
 }
 
 export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
+  const { t } = useTranslation()
   if (fields.length === 0) return null
 
   return (
@@ -35,7 +37,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
                 className={`${inputBase} mt-1.5 cursor-pointer`}
               >
                 {!f.required ? (
-                  <option value="">（不传递）</option>
+                  <option value="">{t('toolArgs.omit')}</option>
                 ) : null}
                 {f.enumValues.map((v) => (
                   <option key={String(v)} value={String(v)}>
@@ -61,7 +63,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
                 onChange={(e) => onChange(f.key, e.target.value)}
                 className={`${inputBase} mt-1.5 cursor-pointer`}
               >
-                {!f.required ? <option value="">（不传递）</option> : null}
+                {!f.required ? <option value="">{t('toolArgs.omit')}</option> : null}
                 <option value="false">false</option>
                 <option value="true">true</option>
               </select>
@@ -86,7 +88,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
                 inputMode="decimal"
                 value={values[f.key] ?? ''}
                 onChange={(e) => onChange(f.key, e.target.value)}
-                placeholder={f.kind === 'integer' ? '例如：42' : '例如：3.14'}
+                placeholder={f.kind === 'integer' ? t('toolArgs.placeholderInt') : t('toolArgs.placeholderNumber')}
                 className={`${inputBase} mt-1.5 font-mono text-xs`}
               />
               {hint}
@@ -108,7 +110,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
                 onChange={(e) => onChange(f.key, e.target.value)}
                 spellCheck={false}
                 rows={4}
-                placeholder="{} 或 []"
+                placeholder={t('toolArgs.placeholderJson')}
                 className={`${inputBase} mt-1.5 resize-y font-mono text-xs leading-relaxed`}
               />
               {hint}

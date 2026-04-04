@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { McpConnectDiagnostics, McpConnectStep } from '@shared/types'
 import { useAddressStore } from '@/stores/addressStore'
 import { useToolsStore } from '@/stores/toolsStore'
@@ -37,27 +38,39 @@ function ToolbarIcon({
   )
 }
 
-function mcpSessionIdHint(step: McpConnectStep, had: boolean): string {
+const STEP_LABEL_KEYS: Record<McpConnectStep, string> = {
+  initialize: 'tools.stepInitialize',
+  'notifications/initialized': 'tools.stepNotificationsInitialized',
+  'tools/list': 'tools.stepToolsList',
+  'tools/call': 'tools.stepToolsCall',
+}
+
+function mcpSessionIdHint(
+  step: McpConnectStep,
+  had: boolean,
+  tr: (key: string) => string,
+): string {
   if (step === 'initialize') {
-    return had ? '是（initialize 响应头含 Mcp-Session-Id）' : '否（响应头未返回 Mcp-Session-Id）'
+    return had ? tr('tools.diagInitWithSession') : tr('tools.diagInitNoSession')
   }
-  return had ? '是（本步请求已携带 Mcp-Session-Id）' : '否（无会话，请求未带 Mcp-Session-Id）'
+  return had ? tr('tools.diagStepWithSession') : tr('tools.diagStepNoSession')
 }
 
 function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
+  const { t } = useTranslation()
   return (
     <div className="mt-3 border-t border-red-300/50 pt-3 text-[11px] leading-relaxed text-red-900 dark:border-red-500/20 dark:text-red-100/85">
       <div className="mb-1.5 font-semibold uppercase tracking-wider text-red-700 dark:text-red-300/90">
-        连接诊断
+        {t('tools.diagTitle')}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono">
-        <dt className="text-red-700 dark:text-red-400/90">失败步骤</dt>
-        <dd>{d.step}</dd>
-        <dt className="text-red-700 dark:text-red-400/90">HTTP 状态</dt>
-        <dd>{d.httpStatus === null ? '—（未收到响应，如超时/网络）' : d.httpStatus}</dd>
-        <dt className="text-red-700 dark:text-red-400/90">Mcp-Session-Id</dt>
-        <dd>{mcpSessionIdHint(d.step, d.hadSessionId)}</dd>
-        <dt className="text-red-700 dark:text-red-400/90">详情</dt>
+        <dt className="text-red-700 dark:text-red-400/90">{t('tools.diagFailStep')}</dt>
+        <dd>{t(STEP_LABEL_KEYS[d.step])}</dd>
+        <dt className="text-red-700 dark:text-red-400/90">{t('tools.diagHttpStatus')}</dt>
+        <dd>{d.httpStatus === null ? t('tools.diagHttpNoResponse') : d.httpStatus}</dd>
+        <dt className="text-red-700 dark:text-red-400/90">{t('tools.diagSessionId')}</dt>
+        <dd>{mcpSessionIdHint(d.step, d.hadSessionId, t)}</dd>
+        <dt className="text-red-700 dark:text-red-400/90">{t('tools.diagDetail')}</dt>
         <dd className="whitespace-pre-wrap break-all text-red-950 dark:text-red-50/90">{d.detail}</dd>
       </dl>
     </div>
@@ -65,6 +78,7 @@ function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
 }
 
 export function ToolsPanel() {
+  const { t } = useTranslation()
   const { servers, selectedId } = useAddressStore()
   const selected = useMemo(
     () => servers.find((s) => s.id === selectedId) ?? null,
@@ -157,7 +171,7 @@ export function ToolsPanel() {
     if (argsMode === 'form' && schemaFields.length > 0) {
       const built = buildArgumentsFromForm(schemaFields, formValues)
       if (!built.ok) {
-        setArgsParseError(built.error)
+        setArgsParseError(t(`tools.formErrors.${built.error.kind}`, { field: built.error.field }))
         return
       }
       args = built.args
@@ -165,12 +179,12 @@ export function ToolsPanel() {
       try {
         const parsed: unknown = JSON.parse(toolArgsJson || '{}')
         if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          setArgsParseError('顶层须为 JSON 对象，例如 {} 或 {"key":"value"}')
+          setArgsParseError(t('tools.argsRootObject'))
           return
         }
         args = parsed as Record<string, unknown>
       } catch {
-        setArgsParseError('JSON 格式无效')
+        setArgsParseError(t('tools.argsInvalidJson'))
         return
       }
     }
@@ -198,16 +212,16 @@ export function ToolsPanel() {
     } finally {
       setCallLoading(false)
     }
-  }, [selected?.url, selected?.headers, selectedTool, toolArgsJson, argsMode, schemaFields, formValues])
+  }, [selected?.url, selected?.headers, selectedTool, toolArgsJson, argsMode, schemaFields, formValues, t])
 
   const statusLabel =
     connection === 'idle'
-      ? '待命'
+      ? t('tools.statusIdle')
       : connection === 'loading'
-        ? '连接中'
+        ? t('tools.statusLoading')
         : connection === 'ok'
-          ? '已连接'
-          : '失败'
+          ? t('tools.statusOk')
+          : t('tools.statusError')
 
   const statusDot =
     connection === 'ok'
@@ -246,7 +260,7 @@ export function ToolsPanel() {
             data-testid="mcp-tools-header"
             className="truncate text-base font-semibold leading-tight tracking-tight text-zinc-900 dark:text-white sm:text-lg"
           >
-            {selected ? selected.name : '选择 MCP 服务'}
+            {selected ? selected.name : t('tools.selectService')}
           </h1>
           {selected ? (
             <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-500 sm:text-xs" title={selected.url}>
@@ -254,7 +268,7 @@ export function ToolsPanel() {
             </p>
           ) : (
             <p className="mt-0.5 text-[11px] text-zinc-500 sm:text-xs dark:text-zinc-600">
-              在侧栏选择地址后在此查看工具
+              {t('tools.selectAddressHint')}
             </p>
           )}
         </div>
@@ -262,14 +276,14 @@ export function ToolsPanel() {
         <div
           className="flex flex-wrap items-center gap-2 sm:gap-1.5"
           role="toolbar"
-          aria-label="连接与操作"
+          aria-label={t('tools.toolbarAria')}
         >
           {showToolCount ? (
             <span
               className="order-first rounded-md border border-cyan-500/35 bg-cyan-500/10 px-2 py-1 text-[11px] font-medium tabular-nums text-cyan-800 dark:border-cyan-500/20 dark:text-cyan-200/90 sm:order-none"
-              title="当前端点返回的工具数量"
+              title={t('tools.toolCountTitle')}
             >
-              {tools.length} 工具
+              {t('tools.toolCount', { count: tools.length })}
             </span>
           ) : null}
 
@@ -281,7 +295,7 @@ export function ToolsPanel() {
 
           <div
             className="inline-flex items-center gap-2 rounded-lg border border-zinc-200/90 bg-white/80 px-2.5 py-1.5 dark:border-white/[0.08] dark:bg-zinc-950/60 sm:px-3"
-            title="与 MCP 服务端的连接状态"
+            title={t('tools.connectionStatus')}
           >
             <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot}`} aria-hidden />
             <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">{statusLabel}</span>
@@ -298,7 +312,7 @@ export function ToolsPanel() {
               <button
                 type="button"
                 onClick={() => void copyUrl()}
-                title="复制端点 URL"
+                title={t('tools.copyUrlTitle')}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-700/90 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-white"
               >
                 <ToolbarIcon>
@@ -306,8 +320,8 @@ export function ToolsPanel() {
                     <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2v2a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm0 2v2h6a2 2 0 0 1 2 2v6h2V2H4zm2 4H2v8h8V8H6z" />
                   </svg>
                 </ToolbarIcon>
-                <span className="hidden sm:inline">{copyDone ? '已复制' : '复制 URL'}</span>
-                <span className="sm:hidden">{copyDone ? '✓' : '复制'}</span>
+                <span className="hidden sm:inline">{copyDone ? t('tools.copied') : t('tools.copyUrl')}</span>
+                <span className="sm:hidden">{copyDone ? '✓' : t('tools.copyShort')}</span>
               </button>
             ) : null}
 
@@ -316,7 +330,9 @@ export function ToolsPanel() {
                 type="button"
                 onClick={retry}
                 disabled={connection === 'loading'}
-                title={connection === 'loading' ? '正在请求…' : '重新执行 initialize 与 tools/list'}
+                title={
+                  connection === 'loading' ? t('tools.refreshLoadingTitle') : t('tools.refreshIdleTitle')
+                }
                 className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-600/35 bg-gradient-to-b from-cyan-100/90 to-teal-50/80 px-2.5 py-1.5 text-xs font-semibold text-cyan-900 transition hover:border-cyan-500/50 hover:from-cyan-100 hover:to-teal-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-cyan-500/30 dark:from-cyan-500/15 dark:to-teal-500/10 dark:text-cyan-100 dark:hover:border-cyan-400/50 dark:hover:from-cyan-500/25 dark:hover:to-teal-500/15"
               >
                 <ToolbarIcon className={connection === 'loading' ? 'animate-spin' : ''}>
@@ -324,7 +340,7 @@ export function ToolsPanel() {
                     <path d="M8 0a8 8 0 1 0 8 8h-2A6 6 0 1 1 8 2V0z" />
                   </svg>
                 </ToolbarIcon>
-                {connection === 'loading' ? '刷新中…' : '刷新列表'}
+                {connection === 'loading' ? t('tools.refreshLoading') : t('tools.refresh')}
               </button>
             ) : null}
           </div>
@@ -341,11 +357,17 @@ export function ToolsPanel() {
       <div className="flex min-h-0 flex-1">
         <section className="flex w-[min(100%,24rem)] shrink-0 flex-col border-r border-zinc-200/90 bg-white/50 dark:border-white/[0.06] dark:bg-zinc-950/30">
           <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-4 dark:border-white/[0.04] dark:bg-zinc-950/40">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Tools</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              {t('tools.sectionTools')}
+            </span>
             {connection === 'ok' && tools.length > 0 ? (
               <span
                 className="ml-2 rounded bg-zinc-200/90 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
-                title={toolListQuery.trim() ? `筛选结果 / 共 ${tools.length} 个` : '工具总数'}
+                title={
+                  toolListQuery.trim()
+                    ? t('tools.filterCountTitle', { total: tools.length })
+                    : t('tools.totalCountTitle')
+                }
               >
                 {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
               </span>
@@ -355,7 +377,7 @@ export function ToolsPanel() {
             <div className="shrink-0 border-b border-zinc-200/80 px-3 py-2 dark:border-white/[0.04]">
               <div className="flex min-w-0 items-center gap-2">
                 <label className="sr-only" htmlFor="mcp-tool-list-filter">
-                  搜索工具
+                  {t('tools.searchLabel')}
                 </label>
                 <input
                   id="mcp-tool-list-filter"
@@ -364,17 +386,17 @@ export function ToolsPanel() {
                   onChange={(e) => setToolListQuery(e.target.value)}
                   placeholder={
                     toolListSearchField === 'name'
-                      ? '搜索名称…'
+                      ? t('tools.searchPlaceholderName')
                       : toolListSearchField === 'description'
-                        ? '搜索说明…'
-                        : '搜索名称或说明…'
+                        ? t('tools.searchPlaceholderDesc')
+                        : t('tools.searchPlaceholderBoth')
                   }
                   autoComplete="off"
                   spellCheck={false}
                   className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none ring-cyan-500/25 placeholder:text-zinc-400 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-cyan-500/35"
                 />
                 <label className="sr-only" htmlFor="mcp-tool-list-field">
-                  匹配范围
+                  {t('tools.fieldLabel')}
                 </label>
                 <select
                   id="mcp-tool-list-field"
@@ -382,7 +404,7 @@ export function ToolsPanel() {
                   onChange={(e) =>
                     setToolListSearchField(e.target.value as 'name' | 'description' | 'both')
                   }
-                  title="匹配范围"
+                  title={t('tools.fieldTitle')}
                   className="shrink-0 cursor-pointer rounded-lg border border-zinc-300 bg-white py-2 pl-2 pr-7 text-[11px] font-medium text-zinc-800 outline-none ring-cyan-500/25 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:text-zinc-200 dark:focus:border-cyan-500/35"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")`,
@@ -391,43 +413,39 @@ export function ToolsPanel() {
                     appearance: 'none',
                   }}
                 >
-                  <option value="name">名称</option>
-                  <option value="description">说明</option>
-                  <option value="both">名称&amp;说明</option>
+                  <option value="name">{t('tools.optionName')}</option>
+                  <option value="description">{t('tools.optionDescription')}</option>
+                  <option value="both">{t('tools.optionBoth')}</option>
                 </select>
               </div>
             </div>
           ) : null}
           <div className="flex-1 overflow-y-auto p-3">
             {connection === 'loading' ? (
-              <EmptyHint title="正在拉取 tools/list…" detail="按 MCP 规范完成握手与请求" />
+              <EmptyHint title={t('tools.emptyFetching')} detail={t('tools.emptyFetchingDetail')} />
             ) : !selected ? (
-              <EmptyHint title="未选择服务" detail="请先在侧栏添加并点击一个 MCP 地址" />
+              <EmptyHint title={t('tools.emptyNoService')} detail={t('tools.emptyNoServiceDetail')} />
             ) : connection === 'ok' && tools.length === 0 ? (
-              <EmptyHint title="暂无工具" detail="该端点未返回任何 tool" />
+              <EmptyHint title={t('tools.emptyNoTools')} detail={t('tools.emptyNoToolsDetail')} />
             ) : connection === 'ok' ? (
               filteredTools.length === 0 ? (
                 <EmptyHint
-                  title="无匹配工具"
-                  detail={
-                    toolListQuery.trim()
-                      ? '可更换右侧匹配范围（名称 / 说明 / 名称&说明）或清空搜索框'
-                      : undefined
-                  }
+                  title={t('tools.emptyNoMatch')}
+                  detail={toolListQuery.trim() ? t('tools.emptyNoMatchDetail') : undefined}
                 />
               ) : (
                 <ul data-testid="mcp-tool-list" className="flex flex-col gap-2">
-                  {toolsListToRender.map((t) => {
-                    const on = t.name === selectedToolName
+                  {toolsListToRender.map((tool) => {
+                    const on = tool.name === selectedToolName
                     const pinned =
                       toolListQuery.trim() &&
-                      selectedToolName === t.name &&
-                      !filteredTools.some((x) => x.name === t.name)
+                      selectedToolName === tool.name &&
+                      !filteredTools.some((x) => x.name === tool.name)
                     return (
-                      <li key={t.name}>
+                      <li key={tool.name}>
                         <button
                           type="button"
-                          onClick={() => setSelectedTool(t.name)}
+                          onClick={() => setSelectedTool(tool.name)}
                           className={`w-full rounded-xl border px-3.5 py-3 text-left transition-all ${
                             on
                               ? 'border-cyan-500/45 bg-gradient-to-br from-cyan-500/15 to-transparent shadow-sm dark:border-cyan-500/35 dark:from-cyan-500/10 dark:shadow-panel'
@@ -436,13 +454,13 @@ export function ToolsPanel() {
                         >
                           {pinned ? (
                             <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
-                              当前选中（不在筛选内）
+                              {t('tools.pinned')}
                             </div>
                           ) : null}
-                          <div className="font-medium text-zinc-900 dark:text-zinc-100">{t.name}</div>
-                          {t.description ? (
+                          <div className="font-medium text-zinc-900 dark:text-zinc-100">{tool.name}</div>
+                          {tool.description ? (
                             <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
-                              {t.description}
+                              {tool.description}
                             </div>
                           ) : null}
                         </button>
@@ -458,12 +476,12 @@ export function ToolsPanel() {
         <section className="min-w-0 flex-1 overflow-y-auto bg-zinc-50/50 dark:bg-zinc-950/20">
           <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-6 dark:border-white/[0.04] dark:bg-zinc-950/40">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
-              详情
+              {t('tools.detailSection')}
             </span>
           </div>
           <div className="p-6">
             {!selectedTool ? (
-              <EmptyHint title="未选择工具" detail="在左侧列表中点击某个 tool 查看名称、说明与 inputSchema" />
+              <EmptyHint title={t('tools.emptyNoTool')} detail={t('tools.emptyNoToolDetail')} />
             ) : (
               <div className="space-y-5">
                 <div>
@@ -498,7 +516,7 @@ export function ToolsPanel() {
                       inputSchema
                     </span>
                     <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
-                      {inputSchemaOpen ? '点击收起' : '点击展开'}
+                      {inputSchemaOpen ? t('tools.schemaToggleCollapse') : t('tools.schemaToggleExpand')}
                     </span>
                   </button>
                   {inputSchemaOpen ? (
@@ -527,26 +545,30 @@ export function ToolsPanel() {
                     </svg>
                     <span className="h-px w-6 shrink-0 bg-zinc-300 dark:bg-zinc-700" aria-hidden />
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                      工具测试
+                      {t('tools.toolTest')}
                     </span>
                     <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
-                      {toolTestOpen ? '点击收起' : '点击展开'}
+                      {toolTestOpen ? t('tools.schemaToggleCollapse') : t('tools.schemaToggleExpand')}
                     </span>
                   </button>
                   {toolTestOpen ? (
                     <div className="border-t border-zinc-200/80 px-1 pb-2 pt-2 dark:border-white/[0.04]">
                   <p className="mb-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
-                    按 <span className="font-mono text-zinc-700 dark:text-zinc-400">inputSchema</span>
-                    （JSON Schema）生成表单，或直接编辑 JSON 作为{' '}
-                    <span className="font-mono text-zinc-700 dark:text-zinc-400">tools/call</span> 的{' '}
-                    <span className="font-mono text-zinc-700 dark:text-zinc-400">arguments</span>。
+                    <Trans
+                      i18nKey="tools.toolTestHint"
+                      components={{
+                        schema: <span className="font-mono text-zinc-700 dark:text-zinc-400" />,
+                        call: <span className="font-mono text-zinc-700 dark:text-zinc-400" />,
+                        args: <span className="font-mono text-zinc-700 dark:text-zinc-400" />,
+                      }}
+                    />
                   </p>
 
                   {schemaFields.length > 0 ? (
                     <div
                       className="mb-3 inline-flex rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5 dark:border-white/[0.08] dark:bg-zinc-900/50"
                       role="tablist"
-                      aria-label="参数编辑方式"
+                      aria-label={t('tools.argsModeAria')}
                     >
                       <button
                         type="button"
@@ -592,7 +614,7 @@ export function ToolsPanel() {
                             : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-300'
                         }`}
                       >
-                        表单
+                        {t('tools.formMode')}
                       </button>
                       <button
                         type="button"
@@ -612,12 +634,15 @@ export function ToolsPanel() {
                             : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-300'
                         }`}
                       >
-                        JSON
+                        {t('tools.jsonMode')}
                       </button>
                     </div>
                   ) : (
                     <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-600">
-                      当前工具未声明 <span className="font-mono">properties</span>，请使用 JSON 编辑参数。
+                      <Trans
+                        i18nKey="tools.noPropertiesHint"
+                        components={{ p: <span className="font-mono" /> }}
+                      />
                     </p>
                   )}
 
@@ -636,7 +661,7 @@ export function ToolsPanel() {
                       rows={6}
                       className="mb-2 w-full resize-y rounded-xl border border-zinc-300 bg-white px-3 py-2.5 font-mono text-xs leading-relaxed text-zinc-900 outline-none ring-cyan-500/30 placeholder:text-zinc-400 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/80 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-cyan-500/35"
                       placeholder='{"query": "..."}'
-                      aria-label="工具调用参数 JSON"
+                      aria-label={t('tools.argsJsonAria')}
                     />
                   )}
                   {argsParseError ? (
@@ -651,10 +676,10 @@ export function ToolsPanel() {
                     {callLoading ? (
                       <>
                         <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-600/40 border-t-teal-700 dark:border-teal-200/30 dark:border-t-teal-200" />
-                        调用中…
+                        {t('tools.callRunning')}
                       </>
                     ) : (
-                      <>执行 tools/call</>
+                      <>{t('tools.callButton')}</>
                     )}
                   </button>
                   {callError ? (
@@ -666,7 +691,7 @@ export function ToolsPanel() {
                   {callResult !== null && !callError ? (
                     <div className="mt-3">
                       <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                        返回结果
+                        {t('tools.resultTitle')}
                       </div>
                       <pre className="max-h-[min(24rem,50vh)] overflow-auto rounded-xl border border-zinc-200/90 bg-emerald-50/80 p-4 text-xs leading-relaxed text-emerald-950 shadow-inner dark:border-white/[0.06] dark:bg-zinc-900/60 dark:text-emerald-100/90">
                         {(() => {

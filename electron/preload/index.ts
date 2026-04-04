@@ -7,6 +7,7 @@ import type {
   MCPHttpHeader,
   MCPServer,
 } from '../../shared/types'
+import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 
 /** 仅用于 electron-updater 模板组件的窄接口，不暴露完整 ipcRenderer */
@@ -65,6 +66,12 @@ contextBridge.exposeInMainWorld('appTheme', {
     }
     ipcRenderer.on('app-menu:theme', wrap)
     return () => ipcRenderer.removeListener('app-menu:theme', wrap)
+  },
+})
+
+contextBridge.exposeInMainWorld('appLocale', {
+  notifyLanguageChanged(lng: AppLanguage) {
+    if (lng === 'en' || lng === 'zh-CN') ipcRenderer.send('app:language-changed', lng)
   },
 })
 

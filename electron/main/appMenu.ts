@@ -1,9 +1,28 @@
 import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
+import {
+  formatAboutDialogDetail,
+  getAppShellStrings,
+  interpolateTemplate,
+  type AppShellStrings,
+} from '../../shared/appShellStrings'
+import type { AppLanguage } from '../../shared/locale'
+import { getDefaultAppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 
 export function syncNativeThemeSource(pref: ThemePreference): void {
   nativeTheme.themeSource = pref === 'system' ? 'system' : pref
+}
+
+let menuTheme: ThemePreference = 'system'
+let menuLang: AppLanguage = getDefaultAppLanguage()
+
+export function getMenuLanguage(): AppLanguage {
+  return menuLang
+}
+
+function shellStrings(): AppShellStrings {
+  return getAppShellStrings(menuLang)
 }
 
 function sendThemeToRenderer(pref: ThemePreference): void {
@@ -17,6 +36,7 @@ function openMcpSpecification(): void {
 }
 
 function showAbout(): void {
+  const s = shellStrings()
   const isMac = process.platform === 'darwin'
   if (isMac) {
     app.showAboutPanel()
@@ -25,10 +45,10 @@ function showAbout(): void {
   const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const opts = {
     type: 'info' as const,
-    title: '关于 MCP BROWSER',
+    title: s.aboutDialogTitle,
     message: 'MCP BROWSER',
-    detail: `版本 ${app.getVersion()}\n\n由 Guo's 维护。许可见 LICENSE；上游模板署名见 NOTICE。\n\n本软件按 MCP 公开规范与远端服务通信；规范文档可在菜单「帮助」中打开。`,
-    buttons: ['确定'],
+    detail: formatAboutDialogDetail(s, app.getVersion()),
+    buttons: [s.dialogOk],
     noLink: true,
   }
   void import('electron').then(({ dialog }) => {
@@ -44,14 +64,14 @@ function sendMcpServersBackupMenuAction(action: 'export' | 'import'): void {
 }
 
 function showUsageTips(): void {
+  const s = shellStrings()
   const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const opts = {
     type: 'info' as const,
-    title: '使用说明',
+    title: s.usageDialogTitle,
     message: 'MCP BROWSER',
-    detail:
-      '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n菜单「文件」可导出/导入 MCP 配置 JSON（换机或备份）。\n\n系统相关选项（如浅色 / 深色 / 跟随系统外观）在菜单栏「设置」中；后续其他系统配置也会放在此处。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
-    buttons: ['确定'],
+    detail: s.usageDialogDetail,
+    buttons: [s.dialogOk],
     noLink: true,
   }
   void import('electron').then(({ dialog }) => {
@@ -64,94 +84,102 @@ function showUsageTips(): void {
  * 应用菜单：文件 / 编辑 / 查看 / 设置 / 窗口 / 帮助（macOS 首项为应用菜单）
  * 「设置」集中系统配置类项；后续新增优先放此菜单。
  * @param themePref 与渲染进程 localStorage 同步，用于「设置 → 外观」单选项状态
+ * @param language 界面语言；省略时保留当前值
  */
-export function installAppMenu(themePref: ThemePreference = 'system'): void {
+export function installAppMenu(themePref?: ThemePreference, language?: AppLanguage): void {
+  if (themePref !== undefined) menuTheme = themePref
+  if (language !== undefined) menuLang = language
+
+  const s = shellStrings()
   const isMac = process.platform === 'darwin'
 
   app.setAboutPanelOptions({
     applicationName: 'MCP BROWSER',
     applicationVersion: app.getVersion(),
-    copyright: 'Copyright © Guo\'s\nMIT License — see LICENSE (upstream: NOTICE)',
+    copyright: s.aboutPanelCopyright,
     website: 'https://modelcontextprotocol.io',
   })
 
   const macAppMenu: MenuItemConstructorOptions = {
     label: app.name,
     submenu: [
-      { role: 'about', label: `关于 ${app.name}` },
+      {
+        role: 'about',
+        label: interpolateTemplate(s.macAboutApp, { appName: app.name }),
+      },
       { type: 'separator' },
-      { role: 'services', label: '服务' },
+      { role: 'services', label: s.macServices },
       { type: 'separator' },
-      { role: 'hide', label: `隐藏 ${app.name}` },
-      { role: 'hideOthers', label: '隐藏其他' },
-      { role: 'unhide', label: '显示全部' },
+      { role: 'hide', label: interpolateTemplate(s.macHideApp, { appName: app.name }) },
+      { role: 'hideOthers', label: s.macHideOthers },
+      { role: 'unhide', label: s.macShowAll },
       { type: 'separator' },
-      { role: 'quit', label: '退出' },
+      { role: 'quit', label: s.quit },
     ],
   }
 
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [macAppMenu] : []),
     {
-      label: '文件',
+      label: s.file,
       submenu: [
         {
-          label: '导出 MCP 配置…',
+          label: s.exportMcpConfig,
           click: () => sendMcpServersBackupMenuAction('export'),
         },
         {
-          label: '导入 MCP 配置…',
+          label: s.importMcpConfig,
           click: () => sendMcpServersBackupMenuAction('import'),
         },
         { type: 'separator' },
         isMac
-          ? { label: '关闭窗口', role: 'close', accelerator: 'Cmd+W' }
-          : { label: '退出', role: 'quit', accelerator: 'Ctrl+Q' },
+          ? { label: s.closeWindow, role: 'close', accelerator: 'Cmd+W' }
+          : { label: s.quit, role: 'quit', accelerator: 'Ctrl+Q' },
       ],
     },
     {
-      label: '编辑',
+      label: s.edit,
       submenu: [
-        { label: '撤销', role: 'undo', accelerator: 'CmdOrCtrl+Z' },
-        { label: '重做', role: 'redo', accelerator: 'Shift+CmdOrCtrl+Z' },
+        { label: s.undo, role: 'undo', accelerator: 'CmdOrCtrl+Z' },
+        { label: s.redo, role: 'redo', accelerator: 'Shift+CmdOrCtrl+Z' },
         { type: 'separator' },
-        { label: '剪切', role: 'cut', accelerator: 'CmdOrCtrl+X' },
-        { label: '复制', role: 'copy', accelerator: 'CmdOrCtrl+C' },
-        { label: '粘贴', role: 'paste', accelerator: 'CmdOrCtrl+V' },
-        { label: '粘贴并匹配样式', role: 'pasteAndMatchStyle', accelerator: 'CmdOrCtrl+Shift+V' },
+        { label: s.cut, role: 'cut', accelerator: 'CmdOrCtrl+X' },
+        { label: s.copy, role: 'copy', accelerator: 'CmdOrCtrl+C' },
+        { label: s.paste, role: 'paste', accelerator: 'CmdOrCtrl+V' },
+        { label: s.pasteAndMatchStyle, role: 'pasteAndMatchStyle', accelerator: 'CmdOrCtrl+Shift+V' },
         { type: 'separator' },
-        { label: '全选', role: 'selectAll', accelerator: 'CmdOrCtrl+A' },
+        { label: s.selectAll, role: 'selectAll', accelerator: 'CmdOrCtrl+A' },
       ],
     },
     {
-      label: '查看',
+      label: s.view,
       submenu: [
-        { label: '重新加载', role: 'reload', accelerator: 'CmdOrCtrl+R' },
-        { label: '强制重新加载', role: 'forceReload', accelerator: 'CmdOrCtrl+Shift+R' },
+        { label: s.reload, role: 'reload', accelerator: 'CmdOrCtrl+R' },
+        { label: s.forceReload, role: 'forceReload', accelerator: 'CmdOrCtrl+Shift+R' },
         { type: 'separator' },
         {
-          label: '切换开发者工具',
+          label: s.toggleDevTools,
           role: 'toggleDevTools',
           accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
         },
         { type: 'separator' },
-        { label: '实际大小', role: 'resetZoom' },
-        { label: '放大', role: 'zoomIn', accelerator: 'CmdOrCtrl+=' },
-        { label: '缩小', role: 'zoomOut', accelerator: 'CmdOrCtrl+-' },
+        { label: s.actualSize, role: 'resetZoom' },
+        { label: s.zoomIn, role: 'zoomIn', accelerator: 'CmdOrCtrl+=' },
+        { label: s.zoomOut, role: 'zoomOut', accelerator: 'CmdOrCtrl+-' },
         { type: 'separator' },
-        { label: '全屏', role: 'togglefullscreen', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11' },
+        { label: s.toggleFullscreen, role: 'togglefullscreen', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11' },
       ],
     },
     {
-      label: '设置',
+      label: s.settings,
       submenu: [
         {
-          label: '外观',
+          label: s.appearance,
           submenu: [
             {
-              label: '浅色',
+              label: s.themeLight,
               type: 'radio',
-              checked: themePref === 'light',
+              checked: menuTheme === 'light',
               click: () => {
                 syncNativeThemeSource('light')
                 installAppMenu('light')
@@ -159,9 +187,9 @@ export function installAppMenu(themePref: ThemePreference = 'system'): void {
               },
             },
             {
-              label: '深色',
+              label: s.themeDark,
               type: 'radio',
-              checked: themePref === 'dark',
+              checked: menuTheme === 'dark',
               click: () => {
                 syncNativeThemeSource('dark')
                 installAppMenu('dark')
@@ -169,9 +197,9 @@ export function installAppMenu(themePref: ThemePreference = 'system'): void {
               },
             },
             {
-              label: '跟随系统',
+              label: s.themeSystem,
               type: 'radio',
-              checked: themePref === 'system',
+              checked: menuTheme === 'system',
               click: () => {
                 syncNativeThemeSource('system')
                 installAppMenu('system')
@@ -183,35 +211,35 @@ export function installAppMenu(themePref: ThemePreference = 'system'): void {
       ],
     },
     {
-      label: '窗口',
+      label: s.window,
       submenu: [
-        { label: '最小化', role: 'minimize', accelerator: isMac ? 'Cmd+M' : undefined },
-        { label: '缩放', role: 'zoom' },
+        { label: s.minimize, role: 'minimize', accelerator: isMac ? 'Cmd+M' : undefined },
+        { label: s.zoom, role: 'zoom' },
         ...(isMac
           ? [
               { type: 'separator' as const },
-              { role: 'front' as const, label: '前置全部窗口' },
+              { role: 'front' as const, label: s.bringAllToFront },
             ]
           : []),
       ],
     },
     {
-      label: '帮助',
+      label: s.help,
       submenu: [
         {
-          label: '使用说明',
+          label: s.usageGuide,
           click: showUsageTips,
         },
         { type: 'separator' },
         {
-          label: 'MCP 规范（官方文档）',
+          label: s.mcpSpecOfficial,
           click: openMcpSpecification,
         },
         { type: 'separator' },
         ...(!isMac
           ? [
               {
-                label: '关于 MCP BROWSER',
+                label: s.aboutMcpBrowser,
                 click: showAbout,
               },
             ]

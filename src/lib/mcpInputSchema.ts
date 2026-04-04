@@ -131,9 +131,26 @@ export function initialFormValues(fields: ParsedField[]): Record<string, string>
   return out
 }
 
+export type BuildArgsFailureKind =
+  | 'boolean_required'
+  | 'boolean_invalid'
+  | 'enum_required'
+  | 'enum_invalid'
+  | 'number_required'
+  | 'number_nan'
+  | 'number_integer'
+  | 'json_required'
+  | 'json_parse'
+  | 'string_required'
+
+export type BuildArgsFailure = {
+  kind: BuildArgsFailureKind
+  field: string
+}
+
 export type BuildArgsResult =
   | { ok: true; args: Record<string, unknown> }
-  | { ok: false; error: string }
+  | { ok: false; error: BuildArgsFailure }
 
 /** 将表单字符串值合并为 tools/call 的 arguments 对象 */
 export function buildArgumentsFromForm(
@@ -148,11 +165,11 @@ export function buildArgumentsFromForm(
 
     if (f.kind === 'boolean') {
       if (trimmed === '') {
-        if (f.required) return { ok: false, error: `请为「${f.key}」选择布尔值` }
+        if (f.required) return { ok: false, error: { kind: 'boolean_required', field: f.key } }
         continue
       }
       if (trimmed !== 'true' && trimmed !== 'false') {
-        return { ok: false, error: `字段「${f.key}」布尔值无效` }
+        return { ok: false, error: { kind: 'boolean_invalid', field: f.key } }
       }
       args[f.key] = trimmed === 'true'
       continue
@@ -160,27 +177,27 @@ export function buildArgumentsFromForm(
 
     if (f.kind === 'enum') {
       if (trimmed === '') {
-        if (f.required) return { ok: false, error: `请选择「${f.key}」` }
+        if (f.required) return { ok: false, error: { kind: 'enum_required', field: f.key } }
         continue
       }
       const ev = f.enumValues ?? []
       const hit = ev.find((v) => String(v) === trimmed)
-      if (hit === undefined) return { ok: false, error: `「${f.key}」选项无效` }
+      if (hit === undefined) return { ok: false, error: { kind: 'enum_invalid', field: f.key } }
       args[f.key] = hit
       continue
     }
 
     if (f.kind === 'number' || f.kind === 'integer') {
       if (trimmed === '') {
-        if (f.required) return { ok: false, error: `请填写数字字段「${f.key}」` }
+        if (f.required) return { ok: false, error: { kind: 'number_required', field: f.key } }
         continue
       }
       const n = Number(trimmed)
       if (Number.isNaN(n)) {
-        return { ok: false, error: `「${f.key}」须为有效数字` }
+        return { ok: false, error: { kind: 'number_nan', field: f.key } }
       }
       if (f.kind === 'integer' && !Number.isInteger(n)) {
-        return { ok: false, error: `「${f.key}」须为整数` }
+        return { ok: false, error: { kind: 'number_integer', field: f.key } }
       }
       args[f.key] = n
       continue
@@ -188,20 +205,20 @@ export function buildArgumentsFromForm(
 
     if (f.kind === 'json') {
       if (trimmed === '') {
-        if (f.required) return { ok: false, error: `请填写 JSON 字段「${f.key}」` }
+        if (f.required) return { ok: false, error: { kind: 'json_required', field: f.key } }
         continue
       }
       try {
         args[f.key] = JSON.parse(trimmed) as unknown
       } catch {
-        return { ok: false, error: `「${f.key}」JSON 无法解析` }
+        return { ok: false, error: { kind: 'json_parse', field: f.key } }
       }
       continue
     }
 
     // string
     if (trimmed === '') {
-      if (f.required) return { ok: false, error: `请填写「${f.key}」` }
+      if (f.required) return { ok: false, error: { kind: 'string_required', field: f.key } }
       continue
     }
     args[f.key] = trimmed

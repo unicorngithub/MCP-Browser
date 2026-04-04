@@ -9,11 +9,16 @@ import type {
   MCPServer,
 } from '../shared/types'
 
+import type { AppLanguage } from '../shared/locale'
 import type { ThemePreference } from '../shared/theme'
 
 export interface AppThemeApi {
   notifyPreferenceChanged(pref: ThemePreference): void
   onMenuSelect(handler: (pref: ThemePreference) => void): () => void
+}
+
+export interface AppLocaleApi {
+  notifyLanguageChanged(lng: AppLanguage): void
 }
 
 export interface McpDesktopApi {
@@ -41,6 +46,7 @@ declare global {
     mcpDesktop: McpDesktopApi
     updaterIpc: UpdaterIpcApi
     appTheme?: AppThemeApi
+    appLocale?: AppLocaleApi
   }
 }
 

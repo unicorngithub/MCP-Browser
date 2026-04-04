@@ -1,4 +1,5 @@
 import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +16,11 @@ ipcMain.on('app:theme-preference-changed', (_, pref: unknown) => {
   const p = pref as ThemePreference
   syncNativeThemeSource(p)
   installAppMenu(p)
+})
+
+ipcMain.on('app:language-changed', (_, lng: unknown) => {
+  if (lng !== 'en' && lng !== 'zh-CN') return
+  installAppMenu(undefined, lng as AppLanguage)
 })
 
 app.setName('MCP BROWSER')
