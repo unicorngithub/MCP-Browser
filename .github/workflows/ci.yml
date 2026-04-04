@@ -1,0 +1,95 @@
+# 推送 / PR：类型检查 + 测试构建 + Vitest（Linux 上 E2E 为占位，Win/Mac 见 release 或下方打包 job）
+name: CI
+
+on:
+  push:
+    branches: [main, master, next]
+  pull_request:
+    branches: [main, master, next]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test build (Vite + Electron main/preload, mode=test)
+        run: pnpm run pretest
+
+      - name: Vitest
+        run: pnpm exec vitest run
+
+  # 仅在推送到主开发分支时打安装包（节省 PR 的 Actions 分钟数）；需要可在 PR 上测打包时点 workflow_dispatch
+  build-windows:
+    needs: quality
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/next'))
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Package (NSIS + unpacked)
+        run: pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-browser-windows-${{ github.sha }}
+          path: release/
+          if-no-files-found: error
+
+  build-macos:
+    needs: quality
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/next'))
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Package (dmg + zip)
+        run: pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-browser-macos-${{ github.sha }}
+          path: release/
+          if-no-files-found: error

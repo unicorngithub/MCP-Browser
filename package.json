@@ -24,6 +24,7 @@
     "build:dir": "tsc && vite build && electron-builder --dir",
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "pretest": "vite build --mode=test",
     "test": "vitest run",
