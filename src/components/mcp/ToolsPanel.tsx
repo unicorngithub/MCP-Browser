@@ -515,8 +515,8 @@ export function ToolsPanel() {
                       <path d="M6 4l4 4-4 4V4z" />
                     </svg>
                     <span className="h-px w-6 shrink-0 bg-zinc-300 dark:bg-zinc-700" aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                      inputSchema
+                    <span className="text-[11px] font-semibold normal-case tracking-wide text-zinc-500">
+                      {t('tools.inputSchemaSection')}
                     </span>
                     <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
                       {inputSchemaOpen ? t('tools.schemaToggleCollapse') : t('tools.schemaToggleExpand')}

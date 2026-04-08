@@ -1,9 +1,11 @@
 import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import {
-  formatAboutDialogDetail,
+  escapeHtml,
+  formatAboutWindowBodyHtml,
   getAppShellStrings,
   interpolateTemplate,
+  MCP_BROWSER_REPOSITORY_URL,
   type AppShellStrings,
 } from '../../shared/appShellStrings'
 import type { AppLanguage } from '../../shared/locale'
@@ -35,26 +37,272 @@ function openMcpSpecification(): void {
   void shell.openExternal('https://modelcontextprotocol.io/specification/latest')
 }
 
-function showAbout(): void {
+let aboutBrowserWindow: BrowserWindow | null = null
+
+/** Windows / Linux：HTML 关于窗口，仓库 URL 为可点击超链接（系统原生 MessageBox 无法在正文中放链接） */
+function openNonMacAboutWindow(): void {
   const s = shellStrings()
+  if (aboutBrowserWindow && !aboutBrowserWindow.isDestroyed()) {
+    aboutBrowserWindow.focus()
+    return
+  }
+
+  const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  const bodyHtml = formatAboutWindowBodyHtml(s, app.getVersion())
+  const titleEscaped = escapeHtml(s.aboutDialogTitle)
+  const okEscaped = escapeHtml(s.dialogOk)
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>${titleEscaped}</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #18181b;
+    background: #fafafa;
+  }
+  .shell {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 26px 12px 0;
+    position: relative;
+    overflow: visible;
+    background: #fafafa;
+  }
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    padding: 4px 14px 0;
+    border-radius: 0;
+    border: none;
+    background: #fafafa;
+    box-shadow: none;
+  }
+  .eyebrow {
+    margin: 0 0 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #0891b2;
+  }
+  .title {
+    margin: 0 0 14px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #09090b;
+    line-height: 1.25;
+  }
+  .content p {
+    margin: 0 0 12px;
+    color: #52525b;
+  }
+  .content p:last-child { margin-bottom: 0; }
+  .content p.meta {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: #71717a;
+    margin-bottom: 14px;
+  }
+  .content p.repo {
+    margin-top: 2px;
+    margin-bottom: 12px;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    color: #52525b;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: normal;
+  }
+  .content .repo-label {
+    white-space: nowrap;
+  }
+  a.repo-link {
+    color: #0e7490;
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+    font-size: 11px;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(8, 145, 178, 0.35);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  a.repo-link:hover {
+    color: #155e75;
+    border-bottom-color: rgba(8, 145, 178, 0.65);
+  }
+  .footer {
+    margin-top: 16px;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+  button#ok {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 5px 16px;
+    border: 1px solid #d4d4d8;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #3f3f46;
+    background: #fafafa;
+    box-shadow: none;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  button#ok:hover {
+    background: #f4f4f5;
+    border-color: #c4c4c9;
+  }
+  button#ok:active {
+    background: #e4e4e7;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #09090b; color: #f4f4f5; }
+    .shell { background: #09090b; }
+    .card {
+      background: #09090b;
+    }
+    .eyebrow { color: #22d3ee; }
+    .title { color: #fafafa; }
+    .content p { color: #a1a1aa; }
+    .content p.meta { color: #71717a; }
+    .content p.repo {
+      border: none;
+      background: transparent;
+      color: #a1a1aa;
+    }
+    a.repo-link {
+      color: #67e8f9;
+      border-bottom-color: rgba(34, 211, 238, 0.4);
+    }
+    a.repo-link:hover {
+      color: #a5f3fc;
+      border-bottom-color: rgba(34, 211, 238, 0.75);
+    }
+    button#ok {
+      color: #e4e4e7;
+      background: #27272a;
+      border-color: #3f3f46;
+    }
+    button#ok:hover {
+      background: #3f3f46;
+      border-color: #52525b;
+    }
+    button#ok:active {
+      background: #3f3f46;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <p class="eyebrow">MCP BROWSER</p>
+      <h1 class="title">${titleEscaped}</h1>
+      <div class="content">${bodyHtml}</div>
+      <div class="footer">
+        <button type="button" id="ok">${okEscaped}</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById("ok").addEventListener("click", function () { window.close(); });
+  </script>
+</body>
+</html>`
+
+  const win = new BrowserWindow({
+    parent: parent ?? undefined,
+    modal: !!parent,
+    useContentSize: true,
+    width: 420,
+    height: 260,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    show: false,
+    title: s.aboutDialogTitle,
+    autoHideMenuBar: true,
+    backgroundColor: '#fafafa',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  })
+
+  aboutBrowserWindow = win
+  win.on('closed', () => {
+    if (aboutBrowserWindow === win) aboutBrowserWindow = null
+  })
+
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      e.preventDefault()
+      void shell.openExternal(url)
+    }
+  })
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  /** 按文档实际高度收紧客户区，避免底部大块留白（确认键贴近窗口下沿） */
+  const fitHeightToContent = (): void => {
+    void win.webContents
+      .executeJavaScript(
+        `Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight
+        )`,
+        true,
+      )
+      .then((h: unknown) => {
+        if (typeof h !== 'number' || !Number.isFinite(h)) {
+          win.show()
+          return
+        }
+        const [cw] = win.getContentSize()
+        const nextH = Math.min(Math.max(Math.ceil(h), 200), 900)
+        win.setContentSize(cw, nextH)
+        win.show()
+      })
+      .catch(() => {
+        win.show()
+      })
+  }
+
+  win.webContents.once('did-finish-load', () => {
+    // 主进程无 requestAnimationFrame；用 setImmediate 等一帧再量高，避免永远不 show
+    setImmediate(() => {
+      setImmediate(fitHeightToContent)
+    })
+  })
+  void win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`)
+}
+
+function showAbout(): void {
   const isMac = process.platform === 'darwin'
   if (isMac) {
     app.showAboutPanel()
     return
   }
-  const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-  const opts = {
-    type: 'info' as const,
-    title: s.aboutDialogTitle,
-    message: 'MCP BROWSER',
-    detail: formatAboutDialogDetail(s, app.getVersion()),
-    buttons: [s.dialogOk],
-    noLink: true,
-  }
-  void import('electron').then(({ dialog }) => {
-    if (parent) void dialog.showMessageBox(parent, opts)
-    else void dialog.showMessageBox(opts)
-  })
+  openNonMacAboutWindow()
 }
 
 /** 由菜单触发：通知当前窗口打开 MCP 配置导入/导出流程（渲染进程内对话框） */
@@ -97,7 +345,7 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
     applicationName: 'MCP BROWSER',
     applicationVersion: app.getVersion(),
     copyright: s.aboutPanelCopyright,
-    website: 'https://modelcontextprotocol.io',
+    website: MCP_BROWSER_REPOSITORY_URL,
   })
 
   const macAppMenu: MenuItemConstructorOptions = {

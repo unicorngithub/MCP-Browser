@@ -1,11 +1,24 @@
 import type { AppLanguage } from './locale'
 
+/** 应用开源仓库（关于面板、对话框与外链一致） */
+export const MCP_BROWSER_REPOSITORY_URL = 'https://github.com/unicorngithub/MCP-Browser'
+
 export function interpolateTemplate(template: string, vars: Record<string, string>): string {
   let s = template
   for (const [k, v] of Object.entries(vars)) {
     s = s.split(`{{${k}}}`).join(v)
   }
   return s
+}
+
+/** 嵌入「关于」HTML 正文时对纯文本做转义 */
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 export type AppShellStrings = {
@@ -53,8 +66,8 @@ export type AppShellStrings = {
   /** 原生关于面板版权（多行） */
   aboutPanelCopyright: string
   aboutDialogTitle: string
-  /** showMessageBox detail，含 {{version}} */
-  aboutDialogDetail: string
+  /** 非 macOS「关于」窗口正文（HTML 片段，含 {{version}}、{{repoUrl}}；链接由主进程包装） */
+  aboutWindowBodyHtml: string
   usageDialogTitle: string
   usageDialogDetail: string
   dialogOk: string
@@ -106,8 +119,8 @@ const ZH: AppShellStrings = {
   macHideApp: '隐藏 {{appName}}',
   aboutPanelCopyright: "Copyright © Guo's\nMIT License — see LICENSE (upstream: NOTICE)",
   aboutDialogTitle: '关于 MCP BROWSER',
-  aboutDialogDetail:
-    "版本 {{version}}\n\n由 Guo's 维护。许可见 LICENSE；上游模板署名见 NOTICE。\n\n本软件按 MCP 公开规范与远端服务通信；规范文档可在菜单「帮助」中打开。",
+  aboutWindowBodyHtml:
+    '<p class="meta">版本 {{version}}</p><p>由 Guo\'s 维护。许可见 LICENSE；上游模板署名见 NOTICE。</p><p class="repo"><span class="repo-label">开源仓库：</span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>本软件按 MCP 公开规范与远端服务通信；规范文档可在菜单「帮助」中打开。</p>',
   usageDialogTitle: '使用说明',
   usageDialogDetail:
     '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n菜单「文件」可导出/导入 MCP 配置 JSON（换机或备份）。\n\n系统相关选项（如浅色 / 深色 / 跟随系统外观）在菜单栏「设置」中；后续其他系统配置也会放在此处。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
@@ -160,8 +173,8 @@ const EN: AppShellStrings = {
   macHideApp: 'Hide {{appName}}',
   aboutPanelCopyright: "Copyright © Guo's\nMIT License — see LICENSE (upstream: NOTICE)",
   aboutDialogTitle: 'About MCP BROWSER',
-  aboutDialogDetail:
-    "Version {{version}}\n\nMaintained by Guo's. See LICENSE; upstream credits in NOTICE.\n\nThis app talks to remote services using the public MCP specification; open the spec from the Help menu.",
+  aboutWindowBodyHtml:
+    '<p class="meta">Version {{version}}</p><p>Maintained by Guo\'s. See LICENSE; upstream credits in NOTICE.</p><p class="repo"><span class="repo-label">Open source: </span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>This app talks to remote services using the public MCP specification; open the spec from the Help menu.</p>',
   usageDialogTitle: 'User Guide',
   usageDialogDetail:
     'Add MCP HTTP endpoints in the sidebar; after selecting one, the app fetches the tool list per the protocol and shows each tool’s description and inputSchema.\n\nUse File → Export/Import MCP configuration JSON to move or back up servers.\n\nSystem options (light / dark / match system appearance) are under the Settings menu.\n\nDeveloper tools: Ctrl+Shift+I (macOS: Option+⌘+I).',
@@ -176,6 +189,9 @@ export function getAppShellStrings(lng: AppLanguage): AppShellStrings {
   return lng === 'en' ? EN : ZH
 }
 
-export function formatAboutDialogDetail(s: AppShellStrings, version: string): string {
-  return interpolateTemplate(s.aboutDialogDetail, { version })
+export function formatAboutWindowBodyHtml(s: AppShellStrings, version: string): string {
+  return interpolateTemplate(s.aboutWindowBodyHtml, {
+    version: escapeHtml(version),
+    repoUrl: MCP_BROWSER_REPOSITORY_URL,
+  })
 }

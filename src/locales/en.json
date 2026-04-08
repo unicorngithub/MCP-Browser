@@ -16,7 +16,9 @@
     "editTitle": "Edit",
     "deleteTitle": "Delete",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "dragHandleTitle": "Drag to reorder",
+    "dragHandleAria": "Reorder: drag to move this server in the list"
   },
   "dialog": {
     "addTitle": "Add MCP server",
@@ -104,6 +106,7 @@
     "detailSection": "Details",
     "emptyNoTool": "No tool selected",
     "emptyNoToolDetail": "Click a tool in the list to see name, description, and inputSchema",
+    "inputSchemaSection": "INPUTSCHEMA",
     "schemaToggleExpand": "Expand",
     "schemaToggleCollapse": "Collapse",
     "toolTest": "Tool test",
