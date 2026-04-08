@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { Fragment, useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MCPServer } from '@shared/types'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -13,6 +13,9 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const { t } = useTranslation()
   const { servers, selectedId, select, removeServer, reorderServers, ready } = useAddressStore()
   const dragFromRef = useRef<number | null>(null)
+  const [dropBefore, setDropBefore] = useState<number | null>(null)
+
+  const clearDrop = useCallback(() => setDropBefore(null), [])
 
   const onRowDragStart = useCallback(
     (index: number, e: React.DragEvent) => {
@@ -26,13 +29,18 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
 
   const onRowDragEnd = useCallback(() => {
     dragFromRef.current = null
-  }, [])
+    clearDrop()
+  }, [clearDrop])
 
-  const onRowDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    e.dataTransfer.dropEffect = 'move'
-  }, [])
+  const onRowDragOver = useCallback(
+    (beforeIndex: number, e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      setDropBefore(beforeIndex)
+    },
+    [],
+  )
 
   const onRowDrop = useCallback(
     (beforeIndex: number, e: React.DragEvent) => {
@@ -42,8 +50,9 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
       const from = raw ? Number.parseInt(raw, 10) : dragFromRef.current ?? NaN
       if (Number.isNaN(from)) return
       void reorderServers(from, beforeIndex)
+      clearDrop()
     },
-    [reorderServers],
+    [reorderServers, clearDrop],
   )
 
   const endDropBefore = servers.length
@@ -69,13 +78,23 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
         </button>
       </div>
 
-      <div className="px-3 py-3">
+      <div
+        className="px-3 py-3"
+        onDragOver={(e) => {
+          if (!ready || servers.length === 0) return
+          onRowDragOver(0, e)
+        }}
+        onDrop={(e) => {
+          if (!ready || servers.length === 0) return
+          onRowDrop(0, e)
+        }}
+      >
         <div className="px-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
           {t('sidebar.saved')}
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
         {!ready ? (
           <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-100/80 px-3 py-8 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-500">
             {t('sidebar.loadingConfig')}
@@ -86,22 +105,37 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
             <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">{t('sidebar.noAddressesHint')}</p>
           </div>
         ) : (
-          <ul className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+          <>
+          {/* 独立 6px 间隙行（= gap-1.5），横线在行内垂直居中，不依赖负 top，避免裁切与任意类不生效 */}
+          <ul className="flex min-h-0 flex-1 list-none flex-col overflow-y-auto pb-1 pt-1.5">
             {servers.map((s, index) => {
               const active = s.id === selectedId
+              const showGapLine = dropBefore === index
               return (
-                <li
-                  key={s.id}
-                  onDragOver={onRowDragOver}
-                  onDrop={(e) => onRowDrop(index, e)}
-                  className="relative"
-                >
+                <Fragment key={s.id}>
+                  <li
+                    className={`relative h-1.5 shrink-0 ${showGapLine ? 'bg-cyan-500/10 dark:bg-cyan-400/8' : ''}`}
+                    onDragOver={(e) => onRowDragOver(index, e)}
+                    onDrop={(e) => onRowDrop(index, e)}
+                  >
+                    {showGapLine ? (
+                      <div
+                        className="pointer-events-none absolute left-2 right-2 top-1/2 z-10 h-1.5 -translate-y-1/2 rounded-full bg-cyan-500/55 shadow-[0_0_8px_rgba(6,182,212,0.35)] dark:bg-cyan-400/45"
+                        aria-hidden
+                      />
+                    ) : null}
+                  </li>
+                  <li
+                    className="relative list-none"
+                    onDragOver={(e) => onRowDragOver(index, e)}
+                    onDrop={(e) => onRowDrop(index, e)}
+                  >
                   <div
                     className={`group relative overflow-hidden rounded-xl border transition-all ${
                       active
                         ? 'border-cyan-500/50 bg-gradient-to-br from-cyan-500/15 to-teal-500/10 shadow-sm dark:border-cyan-500/40 dark:from-cyan-500/10 dark:to-teal-500/5 dark:shadow-panel'
                         : 'border-transparent bg-zinc-100/90 hover:border-zinc-300 hover:bg-zinc-100 dark:bg-zinc-900/40 dark:hover:border-zinc-700/80 dark:hover:bg-zinc-900/70'
-                    }`}
+                    } ${dropBefore === index ? 'ring-1 ring-cyan-500/22 ring-offset-1 ring-offset-zinc-50 dark:ring-offset-zinc-950' : ''}`}
                   >
                     {active ? (
                       <div
@@ -161,17 +195,62 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                       </div>
                     </div>
                   </div>
-                </li>
+                  </li>
+                </Fragment>
               )
             })}
             <li
-              className="min-h-[10px] shrink-0 rounded-lg"
-              onDragOver={onRowDragOver}
+              className="relative flex min-h-8 flex-1 list-none flex-col rounded-lg"
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                e.dataTransfer.dropEffect = 'move'
+                setDropBefore(endDropBefore)
+              }}
               onDrop={(e) => onRowDrop(endDropBefore, e)}
             >
-              <div className="h-1" aria-hidden />
+              <div
+                className={`relative h-1.5 shrink-0 ${dropBefore === endDropBefore ? 'bg-cyan-500/10 dark:bg-cyan-400/8' : ''}`}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDropBefore(endDropBefore)
+                }}
+                onDrop={(e) => onRowDrop(endDropBefore, e)}
+              >
+                {dropBefore === endDropBefore ? (
+                  <div
+                    className="pointer-events-none absolute left-2 right-2 top-1/2 z-10 h-1.5 -translate-y-1/2 rounded-full bg-cyan-500/55 shadow-[0_0_8px_rgba(6,182,212,0.35)] dark:bg-cyan-400/45"
+                    aria-hidden
+                  />
+                ) : null}
+              </div>
+              <div
+                className="min-h-4 flex-1"
+                aria-hidden
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDropBefore(endDropBefore)
+                }}
+                onDrop={(e) => onRowDrop(endDropBefore, e)}
+              />
             </li>
           </ul>
+          {/* 独立底部热区：原先 pb-4 空白无法 drop；此处始终 preventDefault，避免禁止光标 */}
+          <div
+            className="h-4 shrink-0"
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setDropBefore(endDropBefore)
+            }}
+            onDrop={(e) => onRowDrop(endDropBefore, e)}
+            aria-hidden
+          />
+          </>
         )}
       </div>
     </aside>
