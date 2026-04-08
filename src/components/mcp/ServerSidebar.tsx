@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MCPServer } from '@shared/types'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -10,7 +11,42 @@ interface ServerSidebarProps {
 
 export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const { t } = useTranslation()
-  const { servers, selectedId, select, removeServer, ready } = useAddressStore()
+  const { servers, selectedId, select, removeServer, reorderServers, ready } = useAddressStore()
+  const dragFromRef = useRef<number | null>(null)
+
+  const onRowDragStart = useCallback(
+    (index: number, e: React.DragEvent) => {
+      e.stopPropagation()
+      dragFromRef.current = index
+      e.dataTransfer.setData('text/plain', String(index))
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    [],
+  )
+
+  const onRowDragEnd = useCallback(() => {
+    dragFromRef.current = null
+  }, [])
+
+  const onRowDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const onRowDrop = useCallback(
+    (beforeIndex: number, e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const raw = e.dataTransfer.getData('text/plain')
+      const from = raw ? Number.parseInt(raw, 10) : dragFromRef.current ?? NaN
+      if (Number.isNaN(from)) return
+      void reorderServers(from, beforeIndex)
+    },
+    [reorderServers],
+  )
+
+  const endDropBefore = servers.length
 
   return (
     <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-r border-zinc-200/80 bg-white/70 shadow-[inset_-1px_0_0_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.06] dark:bg-zinc-950/80 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
@@ -39,7 +75,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-4">
         {!ready ? (
           <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-100/80 px-3 py-8 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-500">
             {t('sidebar.loadingConfig')}
@@ -50,11 +86,16 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
             <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">{t('sidebar.noAddressesHint')}</p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-1.5">
-            {servers.map((s) => {
+          <ul className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+            {servers.map((s, index) => {
               const active = s.id === selectedId
               return (
-                <li key={s.id}>
+                <li
+                  key={s.id}
+                  onDragOver={onRowDragOver}
+                  onDrop={(e) => onRowDrop(index, e)}
+                  className="relative"
+                >
                   <div
                     className={`group relative overflow-hidden rounded-xl border transition-all ${
                       active
@@ -71,8 +112,23 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                     <div className="flex min-w-0">
                       <button
                         type="button"
+                        draggable
+                        title={t('sidebar.dragHandleTitle')}
+                        aria-label={`${s.name}. ${t('sidebar.dragHandleAria')}`}
                         onClick={() => select(s.id)}
-                        className="min-w-0 flex-1 px-3 py-2.5 text-left"
+                        onDragStart={(e) => onRowDragStart(index, e)}
+                        onDragEnd={onRowDragEnd}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+                          e.preventDefault()
+                          const n = servers.length
+                          if (e.key === 'ArrowUp') {
+                            if (index > 0) void reorderServers(index, index - 1)
+                            return
+                          }
+                          if (index < n - 1) void reorderServers(index, Math.min(index + 2, n))
+                        }}
+                        className="min-w-0 flex-1 cursor-pointer touch-none select-none px-3 py-2.5 text-left"
                       >
                         <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{s.name}</div>
                         <div className="mt-0.5 truncate font-mono text-[11px] text-zinc-500">{s.url}</div>
@@ -80,6 +136,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                       <div className="flex shrink-0 flex-col justify-center gap-0.5 border-l border-zinc-200/90 py-1 pr-1 pl-0.5 dark:border-white/[0.04]">
                         <button
                           type="button"
+                          draggable={false}
                           title={t('sidebar.editTitle')}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -91,6 +148,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                         </button>
                         <button
                           type="button"
+                          draggable={false}
                           title={t('sidebar.deleteTitle')}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -106,6 +164,13 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                 </li>
               )
             })}
+            <li
+              className="min-h-[10px] shrink-0 rounded-lg"
+              onDragOver={onRowDragOver}
+              onDrop={(e) => onRowDrop(endDropBefore, e)}
+            >
+              <div className="h-1" aria-hidden />
+            </li>
           </ul>
         )}
       </div>

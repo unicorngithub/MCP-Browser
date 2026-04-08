@@ -16,7 +16,9 @@
     "editTitle": "编辑",
     "deleteTitle": "删除",
     "edit": "编辑",
-    "delete": "删除"
+    "delete": "删除",
+    "dragHandleTitle": "拖动排序",
+    "dragHandleAria": "排序：拖动以调整此端点在列表中的位置"
   },
   "dialog": {
     "addTitle": "添加 MCP 地址",
@@ -104,6 +106,7 @@
     "detailSection": "详情",
     "emptyNoTool": "未选择工具",
     "emptyNoToolDetail": "在左侧列表中点击某个 tool 查看名称、说明与 inputSchema",
+    "inputSchemaSection": "入参结构",
     "schemaToggleExpand": "点击展开",
     "schemaToggleCollapse": "点击收起",
     "toolTest": "工具测试",

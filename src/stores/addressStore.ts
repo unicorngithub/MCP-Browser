@@ -10,6 +10,8 @@ interface AddressState {
   addServer: (name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   updateServer: (id: string, name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   removeServer: (id: string) => Promise<void>
+  /** 将某项拖到「插入到 beforeIndex 之前」；beforeIndex === length 表示末尾 */
+  reorderServers: (fromIndex: number, beforeIndex: number) => Promise<void>
   /** 用导入列表完全替换本地端点（会持久化） */
   replaceAllServers: (list: MCPServer[]) => Promise<void>
 }
@@ -33,11 +35,10 @@ export const useAddressStore = create<AddressState>((set, get) => ({
   hydrate: async () => {
     try {
       const list = await window.mcpDesktop.getServers()
-      const sorted = [...list].sort((a, b) => b.createdAt - a.createdAt)
       const prev = get().selectedId
       const selectedId =
-        prev && sorted.some(s => s.id === prev) ? prev : sorted[0]?.id ?? null
-      set({ servers: sorted, ready: true, selectedId })
+        prev && list.some(s => s.id === prev) ? prev : list[0]?.id ?? null
+      set({ servers: list, ready: true, selectedId })
     } catch {
       set({ servers: [], ready: true, selectedId: null })
     }
@@ -85,9 +86,24 @@ export const useAddressStore = create<AddressState>((set, get) => ({
     set({ servers: next, selectedId: newSel })
   },
 
+  reorderServers: async (fromIndex, beforeIndex) => {
+    const servers = get().servers
+    const n = servers.length
+    if (fromIndex < 0 || fromIndex >= n) return
+    if (beforeIndex < 0 || beforeIndex > n) return
+    if (fromIndex === beforeIndex) return
+    if (fromIndex + 1 === beforeIndex) return
+
+    const next = [...servers]
+    const [item] = next.splice(fromIndex, 1)
+    const insertAt = fromIndex < beforeIndex ? beforeIndex - 1 : beforeIndex
+    next.splice(insertAt, 0, item)
+    await persist(next)
+    set({ servers: next })
+  },
+
   replaceAllServers: async (list) => {
-    const sorted = [...list].sort((a, b) => b.createdAt - a.createdAt)
-    await persist(sorted)
-    set({ servers: sorted, selectedId: sorted[0]?.id ?? null })
+    await persist(list)
+    set({ servers: list, selectedId: list[0]?.id ?? null })
   },
 }))
