@@ -66,8 +66,10 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
           </div>
           <LanguageSwitcher />
         </div>
-        <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">{t('sidebar.title')}</h2>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">{t('sidebar.subtitle')}</p>
+        <div className="select-none">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">{t('sidebar.title')}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">{t('sidebar.subtitle')}</p>
+        </div>
         <button
           type="button"
           onClick={onAdd}
@@ -79,7 +81,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
       </div>
 
       <div
-        className="px-3 py-3"
+        className="px-3 pt-2 pb-0.5"
         onDragOver={(e) => {
           if (!ready || servers.length === 0) return
           onRowDragOver(0, e)
@@ -89,25 +91,25 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
           onRowDrop(0, e)
         }}
       >
-        <div className="px-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
-          {t('sidebar.saved')}
+        <div className="px-1 text-[11px] font-medium normal-case tracking-wide text-zinc-500 dark:text-zinc-600">
+          {t('sidebar.listHeading')}
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pt-0">
         {!ready ? (
-          <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-100/80 px-3 py-8 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-500">
+          <div className="mx-1 select-none rounded-xl border border-dashed border-zinc-300 bg-zinc-100/80 px-3 py-8 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-500">
             {t('sidebar.loadingConfig')}
           </div>
         ) : servers.length === 0 ? (
-          <div className="mx-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 px-3 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900/20">
+          <div className="mx-1 select-none rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 px-3 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900/20">
             <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('sidebar.noAddresses')}</p>
             <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-600">{t('sidebar.noAddressesHint')}</p>
           </div>
         ) : (
           <>
           {/* 独立 6px 间隙行（= gap-1.5），横线在行内垂直居中，不依赖负 top，避免裁切与任意类不生效 */}
-          <ul className="flex min-h-0 flex-1 list-none flex-col overflow-y-auto pb-1 pt-1.5">
+          <ul className="flex min-h-0 flex-1 list-none flex-col overflow-y-auto pb-1 pt-0">
             {servers.map((s, index) => {
               const active = s.id === selectedId
               const showGapLine = dropBefore === index

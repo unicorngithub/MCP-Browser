@@ -10,12 +10,30 @@ import type {
 import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 
-/** 仅用于 electron-updater 模板组件的窄接口，不暴露完整 ipcRenderer */
+/** 与 `electron/main/update.ts` 中 `ipcMain.handle` 名称一致 */
+const UPDATER_INVOKE_CHANNELS = new Set<string>(['check-update', 'start-download', 'quit-and-install'])
+
+/** 与 `electron/main/update.ts` 中 `webContents.send` / `event.sender.send` 频道一致 */
+const UPDATER_ON_CHANNELS = new Set<string>([
+  'update-can-available',
+  'update-error',
+  'download-progress',
+  'update-downloaded',
+])
+
+/** 自动更新专用：禁止任意 channel 转发，避免与 mcp:* 等 IPC 混用 */
 contextBridge.exposeInMainWorld('updaterIpc', {
   invoke(channel: string, ...args: unknown[]) {
+    if (!UPDATER_INVOKE_CHANNELS.has(channel)) {
+      return Promise.reject(new Error(`[updaterIpc] disallowed invoke channel: ${channel}`))
+    }
     return ipcRenderer.invoke(channel, ...args)
   },
   on(channel: string, listener: (event: unknown, ...args: unknown[]) => void) {
+    if (!UPDATER_ON_CHANNELS.has(channel)) {
+      console.error(`[updaterIpc] disallowed on channel: ${channel}`)
+      return () => {}
+    }
     const wrapped = (_e: Electron.IpcRendererEvent, ...rest: unknown[]) =>
       listener(_e as unknown, ...rest)
     ipcRenderer.on(channel, wrapped)
@@ -72,6 +90,14 @@ contextBridge.exposeInMainWorld('appTheme', {
 contextBridge.exposeInMainWorld('appLocale', {
   notifyLanguageChanged(lng: AppLanguage) {
     if (lng === 'en' || lng === 'zh-CN') ipcRenderer.send('app:language-changed', lng)
+  },
+})
+
+contextBridge.exposeInMainWorld('appShellMenu', {
+  onCheckForUpdatesRequest(handler: () => void): () => void {
+    const wrap = () => handler()
+    ipcRenderer.on('app-menu:check-for-updates', wrap)
+    return () => ipcRenderer.removeListener('app-menu:check-for-updates', wrap)
   },
 })
 

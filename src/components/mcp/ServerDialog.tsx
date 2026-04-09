@@ -144,7 +144,7 @@ export function ServerDialog({ open, mode, server, onClose, onSave }: ServerDial
             />
           </label>
 
-          <div className="rounded-xl border border-amber-400/35 bg-amber-50/90 px-3 py-2.5 dark:border-amber-500/20 dark:bg-amber-950/25">
+          <div className="rounded-xl border border-amber-400/35 bg-amber-50/90 px-3 py-2.5 select-none dark:border-amber-500/20 dark:bg-amber-950/25">
             <p className="text-[11px] leading-relaxed text-amber-950 dark:text-amber-100/90">
               <Trans
                 i18nKey="dialog.headersNotice"
@@ -168,7 +168,7 @@ export function ServerDialog({ open, mode, server, onClose, onSave }: ServerDial
               </button>
             </div>
             {headerRows.length === 0 ? (
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-600">{t('dialog.noHeadersHint')}</p>
+              <p className="select-none text-[11px] text-zinc-500 dark:text-zinc-600">{t('dialog.noHeadersHint')}</p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {headerRows.map((row) => (
@@ -205,7 +205,7 @@ export function ServerDialog({ open, mode, server, onClose, onSave }: ServerDial
           </div>
 
           {error ? (
-            <p className="rounded-lg border border-red-300/80 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/20 dark:bg-red-950/40 dark:text-red-300">
+            <p className="select-none rounded-lg border border-red-300/80 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/20 dark:bg-red-950/40 dark:text-red-300">
               {error}
             </p>
           ) : null}

@@ -57,7 +57,7 @@ export interface McpConnectDiagnostics {
   step: McpConnectStep
   /** 该步对应 HTTP 响应状态；尚未收到响应时为 null */
   httpStatus: number | null
-  /** 该步请求所带或上一步响应是否已有 Mcp-Session-Id（initialize 响应头是否返回会话） */
+  /** 该步请求所带或上一步响应是否已有 MCP-Session-Id（initialize 响应头是否返回会话） */
   hadSessionId: boolean
   /** 简要说明（JSON-RPC message、响应体片段等） */
   detail: string
@@ -77,3 +77,6 @@ export type ExportServersJsonResult = { ok: true } | { ok: false; error: string 
 export type ImportServersJsonResult =
   | { ok: true; servers: MCPServer[]; count: number }
   | { ok: false; error: string }
+
+/** 更新弹框 i18n：主进程在 IPC 中附带，渲染进程用 t(`update.error${Key}`) 等映射 */
+export type UpdateErrorUiKey = 'not_packaged' | 'network' | 'download_failed'

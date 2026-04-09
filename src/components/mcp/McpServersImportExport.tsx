@@ -97,7 +97,7 @@ export function McpServersImportExport() {
             <h2 id="mcp-export-title" className="text-base font-semibold text-zinc-900 dark:text-white">
               {t('importExport.exportTitle')}
             </h2>
-            <p className="mt-2 text-xs leading-relaxed text-amber-900 dark:text-amber-200/85">
+            <p className="mt-2 select-none text-xs leading-relaxed text-amber-900 dark:text-amber-200/85">
               {t('importExport.exportWarning')}
             </p>
             <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
@@ -107,7 +107,7 @@ export function McpServersImportExport() {
                 onChange={(e) => setRedactHeaders(e.target.checked)}
                 className="mt-0.5 rounded border-zinc-400 dark:border-zinc-600"
               />
-              <span>
+              <span className="select-none">
                 <Trans
                   i18nKey="importExport.redactNotice"
                   components={{
@@ -155,7 +155,7 @@ export function McpServersImportExport() {
             <h2 id="mcp-import-title" className="text-base font-semibold text-zinc-900 dark:text-white">
               {t('importExport.importTitle')}
             </h2>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-2 select-none text-sm text-zinc-600 dark:text-zinc-400">
               <Trans
                 i18nKey="importExport.importBody"
                 values={{ fileCount: importCandidates.length, currentCount: servers.length }}

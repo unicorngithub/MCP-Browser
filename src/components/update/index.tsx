@@ -1,12 +1,29 @@
 import type { ProgressInfo } from 'electron-updater'
+import type { TFunction } from 'i18next'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Modal from '@/components/update/Modal'
 import Progress from '@/components/update/Progress'
-import './update.css'
+
+function updateErrorLines(err: ErrorType, t: TFunction): { primary: string; technical?: string } {
+  const key = err.uiKey
+  if (key === 'not_packaged') return { primary: t('update.errorNotPackaged') }
+  if (key === 'network') return { primary: t('update.errorNetwork') }
+  if (key === 'download_failed') {
+    const technical = (err.message || err.error?.message || '').trim()
+    return {
+      primary: t('update.errorDownloadFailed'),
+      technical: technical.length > 0 ? technical : undefined,
+    }
+  }
+  const fallback = (err.message || err.error?.message || '').trim()
+  return { primary: fallback.length > 0 ? fallback : t('update.errorUnknown') }
+}
 
 const Update = () => {
-  const [checking, setChecking] = useState(false)
+  const { t } = useTranslation()
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [checkPending, setCheckPending] = useState(false)
   const [versionInfo, setVersionInfo] = useState<VersionInfo>()
   const [updateError, setUpdateError] = useState<ErrorType>()
   const [progressInfo, setProgressInfo] = useState<Partial<ProgressInfo>>()
@@ -21,56 +38,109 @@ const Update = () => {
     onOk: () => void window.updaterIpc.invoke('start-download'),
   })
 
-  const checkUpdate = async () => {
-    setChecking(true)
+  const checkUpdate = useCallback(async () => {
+    setCheckPending(true)
+    setUpdateError(undefined)
+    setVersionInfo(undefined)
+    setUpdateAvailable(false)
+    setProgressInfo({ percent: 0 })
+    setModalOpen(true)
+    setModalBtn({
+      cancelText: t('update.cancel'),
+      okText: t('update.close'),
+      onCancel: () => {
+        setModalOpen(false)
+        setCheckPending(false)
+      },
+      onOk: () => {
+        setModalOpen(false)
+        setCheckPending(false)
+      },
+    })
     const result = (await window.updaterIpc.invoke('check-update')) as
       | import('electron-updater').UpdateCheckResult
       | null
       | { error?: ErrorType }
-    setProgressInfo({ percent: 0 })
-    setChecking(false)
-    setModalOpen(true)
-    if (result && typeof result === 'object' && 'error' in result && result.error) {
-      setUpdateAvailable(false)
-      setUpdateError(result.error)
+    if (result && typeof result === 'object' && 'error' in result) {
+      const raw = result as { message?: string; error: unknown; uiKey?: ErrorType['uiKey'] }
+      if (raw.error instanceof Error) {
+        setCheckPending(false)
+        setUpdateAvailable(false)
+        setUpdateError({
+          message: typeof raw.message === 'string' ? raw.message : raw.error.message,
+          error: raw.error,
+          uiKey: raw.uiKey,
+        })
+        setModalBtn({
+          cancelText: t('update.close'),
+          okText: t('update.close'),
+          onCancel: () => setModalOpen(false),
+          onOk: () => setModalOpen(false),
+        })
+      }
     }
-  }
+  }, [t])
+
+  useEffect(() => {
+    const api = window.appShellMenu
+    if (!api) return
+    return api.onCheckForUpdatesRequest(() => {
+      void checkUpdate()
+    })
+  }, [checkUpdate])
 
   const onUpdateCanAvailable = useCallback((_event: Electron.IpcRendererEvent, arg1: VersionInfo) => {
+    setCheckPending(false)
     setVersionInfo(arg1)
     setUpdateError(undefined)
-    // Can be update
     if (arg1.update) {
       setModalBtn(state => ({
         ...state,
-        cancelText: 'Cancel',
-        okText: 'Update',
+        cancelText: t('update.cancel'),
+        okText: t('update.download'),
+        onCancel: () => setModalOpen(false),
         onOk: () => void window.updaterIpc.invoke('start-download'),
       }))
       setUpdateAvailable(true)
     } else {
       setUpdateAvailable(false)
+      setModalBtn(state => ({
+        ...state,
+        cancelText: t('update.close'),
+        okText: t('update.close'),
+        onCancel: () => setModalOpen(false),
+        onOk: () => setModalOpen(false),
+      }))
     }
-  }, [])
+  }, [t])
 
   const onUpdateError = useCallback((_event: Electron.IpcRendererEvent, arg1: ErrorType) => {
+    setCheckPending(false)
     setUpdateAvailable(false)
     setUpdateError(arg1)
-  }, [])
+    setModalBtn(state => ({
+      ...state,
+      cancelText: t('update.close'),
+      okText: t('update.close'),
+      onCancel: () => setModalOpen(false),
+      onOk: () => setModalOpen(false),
+    }))
+  }, [t])
 
   const onDownloadProgress = useCallback((_event: Electron.IpcRendererEvent, arg1: ProgressInfo) => {
     setProgressInfo(arg1)
   }, [])
 
-  const onUpdateDownloaded = useCallback((_event: Electron.IpcRendererEvent, ...args: any[]) => {
+  const onUpdateDownloaded = useCallback((_event: Electron.IpcRendererEvent, ..._args: unknown[]) => {
     setProgressInfo({ percent: 100 })
     setModalBtn(state => ({
       ...state,
-      cancelText: 'Later',
-      okText: 'Install now',
+      cancelText: t('update.later'),
+      okText: t('update.installNow'),
+      onCancel: () => setModalOpen(false),
       onOk: () => void window.updaterIpc.invoke('quit-and-install'),
     }))
-  }, [])
+  }, [t])
 
   useEffect(() => {
     const unsubs = [
@@ -82,45 +152,66 @@ const Update = () => {
     return () => unsubs.forEach((u) => u())
   }, [onUpdateCanAvailable, onUpdateError, onDownloadProgress, onUpdateDownloaded])
 
+  const vu = t('update.versionUnknown')
+  const errorPresentation = updateError ? updateErrorLines(updateError, t) : null
+
   return (
-    <>
-      <Modal
-        open={modalOpen}
-        cancelText={modalBtn?.cancelText}
-        okText={modalBtn?.okText}
-        onCancel={modalBtn?.onCancel}
-        onOk={modalBtn?.onOk}
-        footer={updateAvailable ? /* hide footer */null : undefined}
-      >
-        <div className='modal-slot'>
-          {updateError
-            ? (
-              <div>
-                <p>Error downloading the latest version.</p>
-                <p>{updateError.message}</p>
-              </div>
-            ) : updateAvailable
+    <Modal
+      open={modalOpen}
+      title={t('update.dialogTitle')}
+      cancelText={modalBtn?.cancelText ?? t('update.cancel')}
+      okText={modalBtn?.okText ?? t('update.close')}
+      onCancel={modalBtn?.onCancel}
+      onOk={modalBtn?.onOk}
+    >
+      {checkPending
+        ? (
+          <p className="text-zinc-600 dark:text-zinc-400">{t('update.checking')}</p>
+        ) : updateError && errorPresentation
+        ? (
+          <div className="space-y-2">
+            <p className="rounded-xl border border-red-300/80 bg-red-50 px-3 py-2 text-sm leading-relaxed text-red-800 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-300">
+              {errorPresentation.primary}
+            </p>
+            {errorPresentation.technical
               ? (
-                <div>
-                  <div>The last version is: v{versionInfo?.newVersion}</div>
-                  <div className='new-version__target'>v{versionInfo?.version} -&gt; v{versionInfo?.newVersion}</div>
-                  <div className='update__progress'>
-                    <div className='progress__title'>Update progress:</div>
-                    <div className='progress__bar'>
-                      <Progress percent={progressInfo?.percent} ></Progress>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-500">
+                  <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                    {t('update.errorTechnicalDetail')}
+                  </span>
+                  <span className="ml-1 font-mono break-all">{errorPresentation.technical}</span>
+                </p>
               )
-              : (
-                <div className='can-not-available'>{JSON.stringify(versionInfo ?? {}, null, 2)}</div>
-              )}
-        </div>
-      </Modal>
-      <button disabled={checking} onClick={checkUpdate}>
-        {checking ? 'Checking...' : 'Check update'}
-      </button>
-    </>
+              : null}
+          </div>
+        ) : updateAvailable
+        ? (
+          <div className="space-y-4">
+            <p className="text-zinc-800 dark:text-zinc-200">
+              {t('update.newVersionLine', { version: versionInfo?.newVersion || vu })}
+            </p>
+            <p className="font-mono text-sm text-cyan-700 dark:text-cyan-400/90">
+              {t('update.versionRange', {
+                current: versionInfo?.version || vu,
+                next: versionInfo?.newVersion || vu,
+              })}
+            </p>
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+                {t('update.progressTitle')}
+              </p>
+              <Progress percent={progressInfo?.percent} />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 text-center">
+            <p className="font-medium text-zinc-900 dark:text-zinc-100">{t('update.noUpdateTitle')}</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {t('update.noUpdateDetail', { version: versionInfo?.version || vu })}
+            </p>
+          </div>
+        )}
+    </Modal>
   )
 }
 

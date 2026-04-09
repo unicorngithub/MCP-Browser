@@ -20,7 +20,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
         const label = f.title ?? f.key
         const id = `tool-arg-${f.key}`
         const hint = f.description ? (
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">{f.description}</p>
+          <p className="mt-1 select-none text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">{f.description}</p>
         ) : null
 
         if (f.kind === 'enum' && f.enumValues?.length) {
@@ -64,8 +64,8 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
                 className={`${inputBase} mt-1.5 cursor-pointer`}
               >
                 {!f.required ? <option value="">{t('toolArgs.omit')}</option> : null}
-                <option value="false">false</option>
-                <option value="true">true</option>
+                <option value="false">{t('toolArgs.boolFalse')}</option>
+                <option value="true">{t('toolArgs.boolTrue')}</option>
               </select>
               {hint}
             </div>
@@ -79,7 +79,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
                 {label}
                 {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
                 <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">
-                  {f.kind === 'integer' ? 'integer' : 'number'}
+                  {f.kind === 'integer' ? t('toolArgs.typeInteger') : t('toolArgs.typeNumber')}
                 </span>
               </label>
               <input
@@ -102,7 +102,9 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
               <label htmlFor={id} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {label}
                 {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
-                <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">JSON</span>
+                <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">
+                  {t('toolArgs.typeJson')}
+                </span>
               </label>
               <textarea
                 id={id}
@@ -124,7 +126,7 @@ export function ToolArgsForm({ fields, values, onChange }: ToolArgsFormProps) {
               {label}
               {f.required ? <span className="ml-1 text-amber-400/90">*</span> : null}
               <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-600">
-                string
+                {t('toolArgs.typeString')}
               </span>
             </label>
             <input

@@ -76,15 +76,15 @@ if (process.platform === 'linux') {
     test(
       '连接官方 Debug MCP 示例端点并拉取 tools/list',
       async () => {
-        await page.getByRole('button', { name: /添加地址/ }).click()
-        await page.getByPlaceholder('例如：本地 MCP 服务').fill(DEMO_MCP_DISPLAY_NAME)
+        await page.getByRole('button', { name: /添加端点/ }).click()
+        await page.getByPlaceholder('示例：本地 MCP 服务').fill(DEMO_MCP_DISPLAY_NAME)
         await page.getByPlaceholder('https://example.com/mcp').fill(DEMO_MCP_HTTP_URL)
         await page.getByRole('button', { name: '保存' }).click()
         const header = page.getByTestId('mcp-tools-header')
         await header.waitFor({ state: 'visible', timeout: 15_000 })
         await expect((await header.textContent())?.trim()).toContain(DEMO_MCP_DISPLAY_NAME)
         await page.getByText('已连接').waitFor({ state: 'visible', timeout: 120_000 })
-        await page.getByText(/\d+\s*工具/).waitFor({ state: 'visible', timeout: 15_000 })
+        await page.getByText(/\d+\s*个\s*工具/).waitFor({ state: 'visible', timeout: 15_000 })
       },
       150_000,
     )
@@ -93,17 +93,17 @@ if (process.platform === 'linux') {
       const firstTool = page.getByTestId('mcp-tool-list').getByRole('button').first()
       await firstTool.waitFor({ state: 'visible', timeout: 15_000 })
       await firstTool.click()
-      await page.getByText('工具测试').waitFor({ state: 'visible', timeout: 25_000 })
+      await page.getByText('工具调用').waitFor({ state: 'visible', timeout: 25_000 })
       if (shouldUpdateScreenshots) {
         fs.mkdirSync(docsImagesDir, { recursive: true })
         await page.screenshot({ path: path.join(docsImagesDir, 'app-window.png') })
       }
     })
 
-    test('点击「添加地址」打开配置弹窗', async () => {
-      await page.getByRole('button', { name: /添加地址/ }).click()
-      const dialogTitle = await page.getByRole('heading', { name: '添加 MCP 地址' }).textContent()
-      expect(dialogTitle?.trim()).eq('添加 MCP 地址')
+    test('点击「添加端点」打开配置弹窗', async () => {
+      await page.getByRole('button', { name: /添加端点/ }).click()
+      const dialogTitle = await page.getByRole('heading', { name: '添加 MCP 端点' }).textContent()
+      expect(dialogTitle?.trim()).eq('添加 MCP 端点')
     })
   })
 }

@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import type {
   CallToolResult,
   FetchToolsResult,
@@ -8,7 +9,6 @@ import type {
 } from '../../shared/types'
 
 const CLIENT_NAME = 'mcp-browser'
-const CLIENT_VERSION = '0.1.0'
 
 const ACCEPT = 'application/json, text/event-stream'
 
@@ -256,7 +256,7 @@ async function openMcpSession(
           params: {
             protocolVersion,
             capabilities: {},
-            clientInfo: { name: CLIENT_NAME, version: CLIENT_VERSION },
+            clientInfo: { name: CLIENT_NAME, version: app.getVersion() },
           },
         },
         null,
