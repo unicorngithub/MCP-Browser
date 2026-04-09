@@ -12,7 +12,7 @@ import {
 
 function EmptyHint({ title, detail }: { title: string; detail?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+    <div className="flex select-none flex-col items-center justify-center px-6 py-16 text-center">
       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-200/90 text-xl text-zinc-500 dark:bg-zinc-800/80">
         ◇
       </div>
@@ -56,10 +56,26 @@ function mcpSessionIdHint(
   return had ? tr('tools.diagStepWithSession') : tr('tools.diagStepNoSession')
 }
 
+/** 与界面诊断块一致，供剪贴板使用 */
+function formatConnectionDiagnosticsPlain(
+  d: McpConnectDiagnostics,
+  tr: (key: string) => string,
+): string {
+  const http =
+    d.httpStatus === null ? tr('tools.diagHttpNoResponse') : String(d.httpStatus)
+  return [
+    tr('tools.diagTitle'),
+    `${tr('tools.diagFailStep')}: ${tr(STEP_LABEL_KEYS[d.step])}`,
+    `${tr('tools.diagHttpStatus')}: ${http}`,
+    `${tr('tools.diagSessionId')}: ${mcpSessionIdHint(d.step, d.hadSessionId, tr)}`,
+    `${tr('tools.diagDetail')}: ${d.detail}`,
+  ].join('\n')
+}
+
 function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
   const { t } = useTranslation()
   return (
-    <div className="mt-3 border-t border-red-300/50 pt-3 text-[11px] leading-relaxed text-red-900 dark:border-red-500/20 dark:text-red-100/85">
+    <div className="mt-3 select-none border-t border-red-300/50 pt-3 text-[11px] leading-relaxed text-red-900 dark:border-red-500/20 dark:text-red-100/85">
       <div className="mb-1.5 font-semibold uppercase tracking-wider text-red-700 dark:text-red-300/90">
         {t('tools.diagTitle')}
       </div>
@@ -78,7 +94,7 @@ function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
 }
 
 export function ToolsPanel() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { servers, selectedId } = useAddressStore()
   const selected = useMemo(
     () => servers.find((s) => s.id === selectedId) ?? null,
@@ -97,12 +113,29 @@ export function ToolsPanel() {
     setSelectedTool,
   } = useToolsStore()
 
+  const toolTestHintComponents = useMemo(
+    () => ({
+      call: <span className="font-mono text-xs text-zinc-700 dark:text-zinc-400" />,
+      js: <span className="font-mono text-xs text-zinc-700 dark:text-zinc-400" />,
+    }),
+    [],
+  )
+
+  const noPropertiesHintComponents = useMemo(
+    () => ({
+      p: <span className="font-mono text-xs text-zinc-700 dark:text-zinc-400" />,
+      call: <span className="font-mono text-xs text-zinc-700 dark:text-zinc-400" />,
+    }),
+    [],
+  )
+
   const selectedTool = useMemo(
     () => tools.find((t) => t.name === selectedToolName) ?? null,
     [tools, selectedToolName],
   )
 
   const [copyDone, setCopyDone] = useState(false)
+  const [copyErrorDone, setCopyErrorDone] = useState(false)
 
   const [toolArgsJson, setToolArgsJson] = useState('{}')
   const [formValues, setFormValues] = useState<Record<string, string>>({})
@@ -249,6 +282,25 @@ export function ToolsPanel() {
     }
   }, [selected?.url])
 
+  const copyConnectionError = useCallback(async () => {
+    if (!error) return
+    let text = error
+    if (connectDiagnostics) {
+      text += `\n\n${formatConnectionDiagnosticsPlain(connectDiagnostics, t)}`
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyErrorDone(true)
+      window.setTimeout(() => setCopyErrorDone(false), 2000)
+    } catch {
+      /* 忽略 */
+    }
+  }, [error, connectDiagnostics, t])
+
+  useEffect(() => {
+    setCopyErrorDone(false)
+  }, [error, connectDiagnostics])
+
   const showToolCount = Boolean(selected && connection === 'ok')
 
   return (
@@ -321,7 +373,7 @@ export function ToolsPanel() {
                   </svg>
                 </ToolbarIcon>
                 <span className="hidden sm:inline">{copyDone ? t('tools.copied') : t('tools.copyUrl')}</span>
-                <span className="sm:hidden">{copyDone ? '✓' : t('tools.copyShort')}</span>
+                <span className="sm:hidden">{copyDone ? t('tools.copyDoneCompact') : t('tools.copyShort')}</span>
               </button>
             ) : null}
 
@@ -349,7 +401,22 @@ export function ToolsPanel() {
 
       {connection === 'error' && error ? (
         <div className="mx-4 mt-3 rounded-xl border border-red-300/80 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-md sm:mx-5 dark:border-red-500/25 dark:bg-red-950/35 dark:text-red-200/95 dark:shadow-lg dark:shadow-red-900/20">
-          <div className="whitespace-pre-wrap">{error}</div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div className="min-w-0 flex-1 select-none whitespace-pre-wrap">{error}</div>
+            <button
+              type="button"
+              onClick={() => void copyConnectionError()}
+              title={t('tools.copyConnectionErrorTitle')}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-red-300/90 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 transition hover:border-red-400 hover:bg-red-100/80 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-200 dark:hover:border-red-400/60 dark:hover:bg-red-900/40"
+            >
+              <ToolbarIcon>
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-3.5 w-3.5 opacity-80">
+                  <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2v2a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm0 2v2h6a2 2 0 0 1 2 2v6h2V2H4zm2 4H2v8h8V8H6z" />
+                </svg>
+              </ToolbarIcon>
+              {copyErrorDone ? t('tools.copied') : t('tools.copyConnectionError')}
+            </button>
+          </div>
           {connectDiagnostics ? <McpConnectDiagnosticsBlock d={connectDiagnostics} /> : null}
         </div>
       ) : null}
@@ -462,7 +529,7 @@ export function ToolsPanel() {
                           ) : null}
                           <div className="font-medium text-zinc-900 dark:text-zinc-100">{tool.name}</div>
                           {tool.description ? (
-                            <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
+                            <div className="mt-1 line-clamp-2 select-none text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
                               {tool.description}
                             </div>
                           ) : null}
@@ -488,11 +555,11 @@ export function ToolsPanel() {
             ) : (
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+                  <h2 className="select-none text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                     {selectedTool.name}
                   </h2>
                   {selectedTool.description ? (
-                    <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-2 select-none text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                       {selectedTool.description}
                     </p>
                   ) : null}
@@ -502,7 +569,7 @@ export function ToolsPanel() {
                     type="button"
                     onClick={() => setInputSchemaOpen((o) => !o)}
                     aria-expanded={inputSchemaOpen}
-                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300 sm:px-5"
                   >
                     <svg
                       viewBox="0 0 16 16"
@@ -523,7 +590,7 @@ export function ToolsPanel() {
                     </span>
                   </button>
                   {inputSchemaOpen ? (
-                    <pre className="mx-1 mb-2 overflow-x-auto rounded-lg border border-zinc-200/80 bg-zinc-100/90 p-4 text-xs leading-relaxed text-cyan-900 shadow-inner dark:border-white/[0.05] dark:bg-zinc-900/60 dark:text-cyan-100/90">
+                    <pre className="mx-4 mb-3 overflow-x-auto rounded-lg border border-zinc-200/80 bg-zinc-100/90 p-4 text-xs leading-relaxed text-cyan-900 shadow-inner dark:border-white/[0.05] dark:bg-zinc-900/60 dark:text-cyan-100/90 sm:mx-5">
                       {JSON.stringify(selectedTool.inputSchema ?? {}, null, 2)}
                     </pre>
                   ) : null}
@@ -534,7 +601,7 @@ export function ToolsPanel() {
                     type="button"
                     onClick={() => setToolTestOpen((o) => !o)}
                     aria-expanded={toolTestOpen}
-                    className="flex w-full items-center gap-2 px-1 py-2 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300 sm:px-5"
                   >
                     <svg
                       viewBox="0 0 16 16"
@@ -547,7 +614,7 @@ export function ToolsPanel() {
                       <path d="M6 4l4 4-4 4V4z" />
                     </svg>
                     <span className="h-px w-6 shrink-0 bg-zinc-300 dark:bg-zinc-700" aria-hidden />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    <span className="text-[11px] font-semibold normal-case tracking-wide text-zinc-500">
                       {t('tools.toolTest')}
                     </span>
                     <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
@@ -555,17 +622,24 @@ export function ToolsPanel() {
                     </span>
                   </button>
                   {toolTestOpen ? (
-                    <div className="border-t border-zinc-200/80 px-1 pb-2 pt-2 dark:border-white/[0.04]">
-                  <p className="mb-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-500">
-                    <Trans
-                      i18nKey="tools.toolTestHint"
-                      components={{
-                        schema: <span className="font-mono text-zinc-700 dark:text-zinc-400" />,
-                        call: <span className="font-mono text-zinc-700 dark:text-zinc-400" />,
-                        args: <span className="font-mono text-zinc-700 dark:text-zinc-400" />,
-                      }}
-                    />
-                  </p>
+                    <div className="border-t border-zinc-200/80 px-4 pb-4 pt-3 dark:border-white/[0.04] sm:px-5">
+                  <div
+                    key={`tool-test-hint-${i18n.language}`}
+                    className="mb-2 text-xs leading-snug text-zinc-600 dark:text-zinc-500"
+                  >
+                    <p className="m-0 select-none">
+                      <Trans
+                        t={t}
+                        i18nKey="tools.toolTestHint1"
+                        components={toolTestHintComponents}
+                      />
+                      <Trans
+                        t={t}
+                        i18nKey="tools.toolTestHint2"
+                        components={toolTestHintComponents}
+                      />
+                    </p>
+                  </div>
 
                   {schemaFields.length > 0 ? (
                     <div
@@ -641,12 +715,23 @@ export function ToolsPanel() {
                       </button>
                     </div>
                   ) : (
-                    <p className="mb-2 text-[11px] text-zinc-500 dark:text-zinc-600">
-                      <Trans
-                        i18nKey="tools.noPropertiesHint"
-                        components={{ p: <span className="font-mono" /> }}
-                      />
-                    </p>
+                    <div
+                      key={`no-props-hint-${i18n.language}`}
+                      className="mb-2 text-xs leading-snug text-zinc-600 dark:text-zinc-500"
+                    >
+                      <p className="m-0 select-none">
+                        <Trans
+                          t={t}
+                          i18nKey="tools.noPropertiesHint1"
+                          components={noPropertiesHintComponents}
+                        />
+                        <Trans
+                          t={t}
+                          i18nKey="tools.noPropertiesHint2"
+                          components={noPropertiesHintComponents}
+                        />
+                      </p>
+                    </div>
                   )}
 
                   {argsMode === 'form' && schemaFields.length > 0 ? (
@@ -663,7 +748,7 @@ export function ToolsPanel() {
                       spellCheck={false}
                       rows={6}
                       className="mb-2 w-full resize-y rounded-xl border border-zinc-300 bg-white px-3 py-2.5 font-mono text-xs leading-relaxed text-zinc-900 outline-none ring-cyan-500/30 placeholder:text-zinc-400 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/80 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-cyan-500/35"
-                      placeholder='{"query": "..."}'
+                      placeholder={t('tools.argsJsonPlaceholder')}
                       aria-label={t('tools.argsJsonAria')}
                     />
                   )}
@@ -686,7 +771,7 @@ export function ToolsPanel() {
                     )}
                   </button>
                   {callError ? (
-                    <div className="mt-3 rounded-xl border border-red-300/80 bg-red-50 p-4 text-xs leading-relaxed text-red-900 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-100/95">
+                    <div className="mt-3 select-none rounded-xl border border-red-300/80 bg-red-50 p-4 text-xs leading-relaxed text-red-900 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-100/95">
                       <pre className="overflow-x-auto whitespace-pre-wrap">{callError}</pre>
                       {callDiagnostics ? <McpConnectDiagnosticsBlock d={callDiagnostics} /> : null}
                     </div>

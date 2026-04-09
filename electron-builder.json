@@ -3,7 +3,11 @@
   "appId": "com.guos.mcpbrowser",
   "productName": "MCP BROWSER",
   "asar": true,
-  "publish": null,
+  "publish": {
+    "provider": "github",
+    "owner": "unicorngithub",
+    "repo": "MCP-Browser"
+  },
   "directories": {
     "output": "release/${version}",
     "buildResources": "build"

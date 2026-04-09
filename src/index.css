@@ -16,6 +16,31 @@
     @apply m-0 h-full;
   }
 
+  /* 默认可选区域仅限表单与代码块，避免误拖选 / Ctrl+A 整块界面 */
+  #root {
+    @apply select-none;
+  }
+
+  /* 仅输入值可选中；占位符不可拖选（空框时不会出现提示词被选中的观感） */
+  #root input,
+  #root textarea,
+  #root [contenteditable='true'],
+  #root pre,
+  #root code {
+    @apply select-text;
+  }
+
+  #root input::placeholder,
+  #root textarea::placeholder {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* 下拉框收起时的文案不参与文本选择（仍可用点击展开选择） */
+  #root select {
+    @apply select-none;
+  }
+
   body {
     @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';

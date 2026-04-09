@@ -37,6 +37,10 @@ function openMcpSpecification(): void {
   void shell.openExternal('https://modelcontextprotocol.io/specification/latest')
 }
 
+function openSourceRepository(): void {
+  void shell.openExternal(MCP_BROWSER_REPOSITORY_URL)
+}
+
 let aboutBrowserWindow: BrowserWindow | null = null
 
 /** Windows / Linux：HTML 关于窗口，仓库 URL 为可点击超链接（系统原生 MessageBox 无法在正文中放链接） */
@@ -311,6 +315,11 @@ function sendMcpServersBackupMenuAction(action: 'export' | 'import'): void {
   if (w && !w.isDestroyed()) w.webContents.send('mcp-menu:servers-backup', action)
 }
 
+function sendCheckForUpdatesRequest(): void {
+  const w = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (w && !w.isDestroyed()) w.webContents.send('app-menu:check-for-updates')
+}
+
 function showUsageTips(): void {
   const s = shellStrings()
   const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
@@ -329,7 +338,8 @@ function showUsageTips(): void {
 }
 
 /**
- * 应用菜单：文件 / 编辑 / 查看 / 设置 / 窗口 / 帮助（macOS 首项为应用菜单）
+ * 应用菜单：文件 / 编辑 / 显示 / 设置 / 帮助；macOS 另含应用菜单与「窗口」菜单。
+ * Windows / Linux 单窗口，不重复提供「窗口」菜单（最小化等用标题栏即可）。
  * 「设置」集中系统配置类项；后续新增优先放此菜单。
  * @param themePref 与渲染进程 localStorage 同步，用于「设置 → 外观」单选项状态
  * @param language 界面语言；省略时保留当前值
@@ -355,8 +365,6 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
         role: 'about',
         label: interpolateTemplate(s.macAboutApp, { appName: app.name }),
       },
-      { type: 'separator' },
-      { role: 'services', label: s.macServices },
       { type: 'separator' },
       { role: 'hide', label: interpolateTemplate(s.macHideApp, { appName: app.name }) },
       { role: 'hideOthers', label: s.macHideOthers },
@@ -394,22 +402,12 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
         { label: s.cut, role: 'cut', accelerator: 'CmdOrCtrl+X' },
         { label: s.copy, role: 'copy', accelerator: 'CmdOrCtrl+C' },
         { label: s.paste, role: 'paste', accelerator: 'CmdOrCtrl+V' },
-        { label: s.pasteAndMatchStyle, role: 'pasteAndMatchStyle', accelerator: 'CmdOrCtrl+Shift+V' },
-        { type: 'separator' },
-        { label: s.selectAll, role: 'selectAll', accelerator: 'CmdOrCtrl+A' },
       ],
     },
     {
       label: s.view,
       submenu: [
         { label: s.reload, role: 'reload', accelerator: 'CmdOrCtrl+R' },
-        { label: s.forceReload, role: 'forceReload', accelerator: 'CmdOrCtrl+Shift+R' },
-        { type: 'separator' },
-        {
-          label: s.toggleDevTools,
-          role: 'toggleDevTools',
-          accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
-        },
         { type: 'separator' },
         { label: s.actualSize, role: 'resetZoom' },
         { label: s.zoomIn, role: 'zoomIn', accelerator: 'CmdOrCtrl+=' },
@@ -458,22 +456,27 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
         },
       ],
     },
-    {
-      label: s.window,
-      submenu: [
-        { label: s.minimize, role: 'minimize', accelerator: isMac ? 'Cmd+M' : undefined },
-        { label: s.zoom, role: 'zoom' },
-        ...(isMac
-          ? [
+    ...(isMac
+      ? [
+          {
+            label: s.window,
+            submenu: [
+              { label: s.minimize, role: 'minimize', accelerator: 'Cmd+M' },
+              { label: s.zoom, role: 'zoom' },
               { type: 'separator' as const },
               { role: 'front' as const, label: s.bringAllToFront },
-            ]
-          : []),
-      ],
-    },
+            ],
+          } satisfies MenuItemConstructorOptions,
+        ]
+      : []),
     {
       label: s.help,
       submenu: [
+        {
+          label: s.checkForUpdates,
+          click: sendCheckForUpdatesRequest,
+        },
+        { type: 'separator' },
         {
           label: s.usageGuide,
           click: showUsageTips,
@@ -482,6 +485,10 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
         {
           label: s.mcpSpecOfficial,
           click: openMcpSpecification,
+        },
+        {
+          label: s.helpOpenSourceRepository,
+          click: openSourceRepository,
         },
         { type: 'separator' },
         ...(!isMac

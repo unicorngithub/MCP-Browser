@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ServerSidebar } from '@/components/mcp/ServerSidebar'
+import Update from '@/components/update'
 import { McpServersImportExport } from '@/components/mcp/McpServersImportExport'
 import { ServerDialog } from '@/components/mcp/ServerDialog'
 import { ToolsPanel } from '@/components/mcp/ToolsPanel'
@@ -66,6 +67,7 @@ export default function App() {
         onSave={onSave}
       />
       <McpServersImportExport />
+      <Update />
     </div>
   )
 }
