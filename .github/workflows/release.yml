@@ -80,6 +80,7 @@ jobs:
             dist/**/MCP BROWSER_*.exe
             dist/**/MCP BROWSER_*.dmg
             dist/**/MCP BROWSER_*.zip
+            dist/**/latest*.yml
             docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

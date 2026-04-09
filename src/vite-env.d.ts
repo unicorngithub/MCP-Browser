@@ -21,6 +21,10 @@ export interface AppLocaleApi {
   notifyLanguageChanged(lng: AppLanguage): void
 }
 
+export interface AppShellMenuApi {
+  onCheckForUpdatesRequest(handler: () => void): () => void
+}
+
 export interface McpDesktopApi {
   getServers(): Promise<MCPServer[]>
   setServers(list: MCPServer[]): Promise<void>
@@ -36,9 +40,17 @@ export interface McpDesktopApi {
   onServersBackupMenuAction(handler: (action: 'export' | 'import') => void): () => void
 }
 
+/** 与 `electron/main/update.ts`、`electron/preload` 白名单保持一致 */
+export type UpdaterInvokeChannel = 'check-update' | 'start-download' | 'quit-and-install'
+export type UpdaterOnChannel =
+  | 'update-can-available'
+  | 'update-error'
+  | 'download-progress'
+  | 'update-downloaded'
+
 export interface UpdaterIpcApi {
-  invoke(channel: string, ...args: unknown[]): Promise<unknown>
-  on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): () => void
+  invoke(channel: UpdaterInvokeChannel, ...args: unknown[]): Promise<unknown>
+  on(channel: UpdaterOnChannel, listener: (event: unknown, ...args: unknown[]) => void): () => void
 }
 
 declare global {
@@ -47,6 +59,7 @@ declare global {
     updaterIpc: UpdaterIpcApi
     appTheme?: AppThemeApi
     appLocale?: AppLocaleApi
+    appShellMenu?: AppShellMenuApi
   }
 }
 

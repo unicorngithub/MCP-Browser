@@ -34,12 +34,8 @@ export type AppShellStrings = {
   cut: string
   copy: string
   paste: string
-  pasteAndMatchStyle: string
-  selectAll: string
   view: string
   reload: string
-  forceReload: string
-  toggleDevTools: string
   actualSize: string
   zoomIn: string
   zoomOut: string
@@ -54,10 +50,13 @@ export type AppShellStrings = {
   zoom: string
   bringAllToFront: string
   help: string
+  /** 帮助菜单：检查应用更新（GitHub Releases + electron-updater） */
+  checkForUpdates: string
   usageGuide: string
   mcpSpecOfficial: string
+  /** 帮助菜单：用系统默认方式打开开源仓库 URL */
+  helpOpenSourceRepository: string
   aboutMcpBrowser: string
-  macServices: string
   macHideOthers: string
   macShowAll: string
   /** macOS 应用菜单「关于 {{appName}}」 */
@@ -89,12 +88,8 @@ const ZH: AppShellStrings = {
   cut: '剪切',
   copy: '复制',
   paste: '粘贴',
-  pasteAndMatchStyle: '粘贴并匹配样式',
-  selectAll: '全选',
-  view: '查看',
-  reload: '重新加载',
-  forceReload: '强制重新加载',
-  toggleDevTools: '切换开发者工具',
+  view: '显示',
+  reload: '刷新界面',
   actualSize: '实际大小',
   zoomIn: '放大',
   zoomOut: '缩小',
@@ -109,24 +104,25 @@ const ZH: AppShellStrings = {
   zoom: '缩放',
   bringAllToFront: '前置全部窗口',
   help: '帮助',
+  checkForUpdates: '检查更新',
   usageGuide: '使用说明',
-  mcpSpecOfficial: 'MCP 规范（官方文档）',
-  aboutMcpBrowser: '关于 MCP BROWSER',
-  macServices: '服务',
+  mcpSpecOfficial: 'MCP 规范（官方）',
+  helpOpenSourceRepository: '源代码仓库（GitHub）',
+  aboutMcpBrowser: '关于 MCP Browser',
   macHideOthers: '隐藏其他',
   macShowAll: '显示全部',
   macAboutApp: '关于 {{appName}}',
   macHideApp: '隐藏 {{appName}}',
   aboutPanelCopyright: "Copyright © Guo's\nMIT License — see LICENSE (upstream: NOTICE)",
-  aboutDialogTitle: '关于 MCP BROWSER',
+  aboutDialogTitle: '关于 MCP Browser',
   aboutWindowBodyHtml:
-    '<p class="meta">版本 {{version}}</p><p>由 Guo\'s 维护。许可见 LICENSE；上游模板署名见 NOTICE。</p><p class="repo"><span class="repo-label">开源仓库：</span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>本软件按 MCP 公开规范与远端服务通信；规范文档可在菜单「帮助」中打开。</p>',
+    '<p class="meta">版本 {{version}}</p><p>由 Guo\'s 维护。许可条款见 LICENSE；上游模板署名见 NOTICE。</p><p class="repo"><span class="repo-label">源代码仓库：</span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>本软件依据 MCP 公开规范与远端服务通信；完整规范可通过菜单「帮助」打开。</p>',
   usageDialogTitle: '使用说明',
   usageDialogDetail:
-    '在侧栏添加 MCP HTTP 端点；选中地址后会按协议拉取 tools 列表，可查看每个工具的说明与 inputSchema。\n\n菜单「文件」可导出/导入 MCP 配置 JSON（换机或备份）。\n\n系统相关选项（如浅色 / 深色 / 跟随系统外观）在菜单栏「设置」中；后续其他系统配置也会放在此处。\n\n开发者工具：Ctrl+Shift+I（macOS：Option+⌘+I）。',
+    '在侧栏添加并选择 MCP（HTTP）端点后，将按协议拉取 tools 列表，并展示各工具说明与入参结构（inputSchema）。\n\n通过菜单「文件」可导出或导入 MCP 端点配置 JSON，用于迁移或备份。\n\n外观等系统级选项位于菜单栏「设置」；其他系统配置亦将归集于此。',
   dialogOk: '确定',
-  dialogExportServersTitle: '导出 MCP 地址配置',
-  dialogImportServersTitle: '导入 MCP 地址配置',
+  dialogExportServersTitle: '导出 MCP 端点配置',
+  dialogImportServersTitle: '导入 MCP 端点配置',
   dialogJsonFilters: 'JSON',
   dialogJsonParseFailed: 'JSON 解析失败',
 }
@@ -136,19 +132,15 @@ const EN: AppShellStrings = {
   exportMcpConfig: 'Export MCP configuration…',
   importMcpConfig: 'Import MCP configuration…',
   closeWindow: 'Close Window',
-  quit: 'Quit',
+  quit: 'Exit',
   edit: 'Edit',
   undo: 'Undo',
   redo: 'Redo',
   cut: 'Cut',
   copy: 'Copy',
   paste: 'Paste',
-  pasteAndMatchStyle: 'Paste and Match Style',
-  selectAll: 'Select All',
-  view: 'View',
-  reload: 'Reload',
-  forceReload: 'Force Reload',
-  toggleDevTools: 'Toggle Developer Tools',
+  view: 'Display',
+  reload: 'Refresh Interface',
   actualSize: 'Actual Size',
   zoomIn: 'Zoom In',
   zoomOut: 'Zoom Out',
@@ -157,30 +149,31 @@ const EN: AppShellStrings = {
   appearance: 'Appearance',
   themeLight: 'Light',
   themeDark: 'Dark',
-  themeSystem: 'Match system',
+  themeSystem: 'Match System',
   window: 'Window',
   minimize: 'Minimize',
   zoom: 'Zoom',
   bringAllToFront: 'Bring All to Front',
   help: 'Help',
+  checkForUpdates: 'Check for Updates',
   usageGuide: 'User Guide',
   mcpSpecOfficial: 'MCP specification (official)',
-  aboutMcpBrowser: 'About MCP BROWSER',
-  macServices: 'Services',
+  helpOpenSourceRepository: 'Source repository (GitHub)',
+  aboutMcpBrowser: 'About MCP Browser',
   macHideOthers: 'Hide Others',
   macShowAll: 'Show All',
   macAboutApp: 'About {{appName}}',
   macHideApp: 'Hide {{appName}}',
   aboutPanelCopyright: "Copyright © Guo's\nMIT License — see LICENSE (upstream: NOTICE)",
-  aboutDialogTitle: 'About MCP BROWSER',
+  aboutDialogTitle: 'About MCP Browser',
   aboutWindowBodyHtml:
-    '<p class="meta">Version {{version}}</p><p>Maintained by Guo\'s. See LICENSE; upstream credits in NOTICE.</p><p class="repo"><span class="repo-label">Open source: </span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>This app talks to remote services using the public MCP specification; open the spec from the Help menu.</p>',
+    '<p class="meta">Version {{version}}</p><p>Maintained by Guo\'s. Licensing terms are in LICENSE; upstream template credits are in NOTICE.</p><p class="repo"><span class="repo-label">Source repository: </span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>This application communicates with remote services according to the public MCP specification; the full spec is available from the Help menu.</p>',
   usageDialogTitle: 'User Guide',
   usageDialogDetail:
-    'Add MCP HTTP endpoints in the sidebar; after selecting one, the app fetches the tool list per the protocol and shows each tool’s description and inputSchema.\n\nUse File → Export/Import MCP configuration JSON to move or back up servers.\n\nSystem options (light / dark / match system appearance) are under the Settings menu.\n\nDeveloper tools: Ctrl+Shift+I (macOS: Option+⌘+I).',
+    'Add and select an MCP (HTTP) endpoint in the sidebar to fetch the tools list per the protocol and inspect each tool’s description and input schema (inputSchema).\n\nUse File → Export/Import MCP endpoint configuration JSON for migration or backup.\n\nAppearance and other system-wide options are under the Settings menu.',
   dialogOk: 'OK',
-  dialogExportServersTitle: 'Export MCP server list',
-  dialogImportServersTitle: 'Import MCP server list',
+  dialogExportServersTitle: 'Export MCP endpoint configuration',
+  dialogImportServersTitle: 'Import MCP endpoint configuration',
   dialogJsonFilters: 'JSON',
   dialogJsonParseFailed: 'Invalid JSON',
 }
