@@ -1,5 +1,5 @@
 # 推送以 v 开头的 tag（如 v0.1.0）时：在 Windows / macOS 上打包并创建 GitHub Release，附件为安装包。
-# 请先同步 package.json 的 version 与 tag（例如 tag v0.1.0 对应 "version": "0.1.0"）。
+# 构建前会用 tag 自动写入 package.json 的 version（v0.1.0 -> 0.1.0），仓库里的 version 仅作日常开发占位即可。
 name: Release
 
 on:
@@ -34,6 +34,11 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Sync package version from git tag
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: node scripts/sync-version-from-tag.mjs
 
       - name: Typecheck
         run: pnpm typecheck
