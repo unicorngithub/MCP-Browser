@@ -16,7 +16,7 @@
   ],
   "icon": "build/icon.png",
   "mac": {
-    "artifactName": "${productName}_${version}.${ext}",
+    "artifactName": "MCP-Browser_${version}.${ext}",
     "target": [
       "dmg",
       "zip"
@@ -33,7 +33,7 @@
         ]
       }
     ],
-    "artifactName": "${productName}_${version}.${ext}"
+    "artifactName": "MCP-Browser_${version}.${ext}"
   },
   "nsis": {
     "oneClick": false,
