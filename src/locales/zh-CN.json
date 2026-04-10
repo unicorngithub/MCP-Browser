@@ -17,6 +17,10 @@
     "deleteTitle": "删除",
     "edit": "编辑",
     "delete": "删除",
+    "deleteConfirmTitle": "删除端点",
+    "deleteConfirmDetail": "确定删除端点「{{name}}」吗？\n\n{{url}}\n\n将移除本地已保存的配置，此操作无法撤销。",
+    "deleteConfirmCancel": "取消",
+    "deleteConfirmAction": "删除",
     "dragHandleTitle": "拖动排序",
     "dragHandleAria": "排序：拖动以调整该端点在列表中的顺序"
   },
@@ -91,6 +95,8 @@
     "refresh": "刷新工具列表",
     "toolbarAria": "连接与操作",
     "sectionTools": "工具",
+    "sessionReuseShort": "复用会话",
+    "sessionReuseTitle": "开启后，同一端点的拉取工具列表与调用工具会复用 MCP 会话（减少 initialize 等握手）。约 15 分钟无操作会过期并自动重建。关闭则每次操作单独建新会话，行为更隔离。",
     "filterCountTitle": "筛选结果 / 共 {{total}} 个",
     "totalCountTitle": "工具总数",
     "searchLabel": "筛选工具",
@@ -131,6 +137,17 @@
     "callRunning": "正在调用…",
     "callButton": "执行 tools/call",
     "resultTitle": "调用结果",
+    "callErrorTitle": "调用失败",
+    "viewHttpDetail": "查看详情",
+    "httpDetailTitle": "请求与响应详情",
+    "httpRequestSection": "请求",
+    "httpResponseSection": "响应",
+    "httpRequestHeaders": "请求头",
+    "httpRequestBody": "请求体",
+    "httpResponseStatus": "HTTP 状态",
+    "httpResponseHeaders": "响应头",
+    "httpResponseBody": "响应体",
+    "httpNoResponse": "未收到 HTTP 响应（例如网络错误或超时）。下方为已发出的请求内容。",
     "diagTitle": "连接诊断",
     "diagFailStep": "失败阶段",
     "diagHttpStatus": "HTTP 状态码",
@@ -159,6 +176,10 @@
       "json_parse": "「{{field}}」的 JSON 无法解析",
       "string_required": "请填写「{{field}}」"
     }
+  },
+  "usageGuide": {
+    "title": "使用说明",
+    "content": "在侧栏添加并选择 MCP（HTTP）端点后，将按协议拉取 tools 列表，并展示各工具说明与入参结构（inputSchema）。\n\n通过菜单「文件」可导出或导入 MCP 端点配置 JSON，用于迁移或备份。\n\n外观等系统级选项位于菜单栏「设置」；其他系统配置亦将归集于此。"
   },
   "update": {
     "dialogTitle": "软件更新",

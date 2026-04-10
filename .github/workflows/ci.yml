@@ -35,5 +35,16 @@ jobs:
       - name: Test build (Vite + Electron main/preload, mode=test)
         run: pnpm run pretest
 
-      - name: Vitest
-        run: pnpm exec vitest run
+      - name: Vitest (unit)
+        run: pnpm exec vitest run --exclude test/e2e.spec.ts
+
+      - name: E2E system deps (virtual display + Electron libs)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libatk1.0-0 libdrm2 libgtk-3-0 libgbm1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+          sudo pnpm exec playwright install-deps chromium
+
+      - name: E2E (Playwright Electron via xvfb-run)
+        run: xvfb-run -a pnpm run test:e2e
+        timeout-minutes: 25

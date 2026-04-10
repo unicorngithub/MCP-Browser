@@ -17,6 +17,10 @@
     "deleteTitle": "Delete",
     "edit": "Edit",
     "delete": "Delete",
+    "deleteConfirmTitle": "Remove endpoint",
+    "deleteConfirmDetail": "Remove \"{{name}}\" from your saved endpoints?\n\n{{url}}\n\nThis cannot be undone.",
+    "deleteConfirmCancel": "Cancel",
+    "deleteConfirmAction": "Remove",
     "dragHandleTitle": "Drag to reorder",
     "dragHandleAria": "Reorder: drag to change this endpoint’s position in the list"
   },
@@ -91,6 +95,8 @@
     "refresh": "Refresh tool list",
     "toolbarAria": "Connection and actions",
     "sectionTools": "Tools",
+    "sessionReuseShort": "Reuse session",
+    "sessionReuseTitle": "When on, tools/list and tools/call for the same endpoint share one MCP session (fewer initialize handshakes). The cache expires after ~15 minutes idle. When off, each operation starts a fresh session.",
     "filterCountTitle": "Filtered / {{total}} total",
     "totalCountTitle": "Total tools",
     "searchLabel": "Filter tools",
@@ -131,6 +137,17 @@
     "callRunning": "Invoking…",
     "callButton": "Run tools/call",
     "resultTitle": "Invocation result",
+    "callErrorTitle": "Invocation failed",
+    "viewHttpDetail": "View details",
+    "httpDetailTitle": "Request & response",
+    "httpRequestSection": "Request",
+    "httpResponseSection": "Response",
+    "httpRequestHeaders": "Request headers",
+    "httpRequestBody": "Request body",
+    "httpResponseStatus": "HTTP status",
+    "httpResponseHeaders": "Response headers",
+    "httpResponseBody": "Response body",
+    "httpNoResponse": "No HTTP response (e.g. network error or timeout). The request below is what was sent.",
     "diagTitle": "Connection diagnostics",
     "diagFailStep": "Failed stage",
     "diagHttpStatus": "HTTP status",
@@ -159,6 +176,10 @@
       "json_parse": "Cannot parse JSON for “{{field}}”.",
       "string_required": "Enter a value for “{{field}}”."
     }
+  },
+  "usageGuide": {
+    "title": "User guide",
+    "content": "Add and select an MCP (HTTP) endpoint in the sidebar to fetch the tools list per the protocol and inspect each tool’s description and input schema (inputSchema).\n\nUse File → Export/Import MCP endpoint configuration JSON for migration or backup.\n\nAppearance and other system-wide options are under the Settings menu."
   },
   "update": {
     "dialogTitle": "Software update",

@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import type { McpConnectDiagnostics, McpConnectStep } from '@shared/types'
+import type { McpConnectDiagnostics, McpConnectStep, McpToolCallHttpTrace } from '@shared/types'
 import { useAddressStore } from '@/stores/addressStore'
 import { useToolsStore } from '@/stores/toolsStore'
 import { ToolArgsForm } from '@/components/mcp/ToolArgsForm'
+import { ToolCallHttpDetailModal } from '@/components/mcp/ToolCallHttpDetailModal'
 import {
   buildArgumentsFromForm,
   initialFormValues,
@@ -111,6 +112,8 @@ export function ToolsPanel() {
     selectedToolName,
     fetchForUrl,
     setSelectedTool,
+    reuseMcpSession,
+    setReuseMcpSession,
   } = useToolsStore()
 
   const toolTestHintComponents = useMemo(
@@ -145,6 +148,8 @@ export function ToolsPanel() {
   const [callError, setCallError] = useState<string | null>(null)
   const [callDiagnostics, setCallDiagnostics] = useState<McpConnectDiagnostics | null>(null)
   const [callResult, setCallResult] = useState<unknown>(null)
+  const [callHttpTrace, setCallHttpTrace] = useState<McpToolCallHttpTrace | null>(null)
+  const [httpDetailOpen, setHttpDetailOpen] = useState(false)
   const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
   const [toolTestOpen, setToolTestOpen] = useState(true)
   const [toolListQuery, setToolListQuery] = useState('')
@@ -157,6 +162,11 @@ export function ToolsPanel() {
     [selectedTool],
   )
 
+  /** 切换工具时清空文本选择，否则 h2/p 节点复用会导致高亮仍覆盖在已替换的文案上 */
+  useEffect(() => {
+    window.getSelection()?.removeAllRanges()
+  }, [selectedToolName])
+
   useEffect(() => {
     setToolArgsJson('{}')
     setFormValues(initialFormValues(schemaFields))
@@ -165,6 +175,8 @@ export function ToolsPanel() {
     setCallError(null)
     setCallDiagnostics(null)
     setCallResult(null)
+    setCallHttpTrace(null)
+    setHttpDetailOpen(false)
     setInputSchemaOpen(true)
     setToolTestOpen(true)
   }, [selectedToolName, schemaFields])
@@ -225,6 +237,8 @@ export function ToolsPanel() {
     setCallError(null)
     setCallDiagnostics(null)
     setCallResult(null)
+    setCallHttpTrace(null)
+    setHttpDetailOpen(false)
     setCallLoading(true)
     try {
       const out = await window.mcpDesktop.callTool(
@@ -232,20 +246,34 @@ export function ToolsPanel() {
         selectedTool.name,
         args,
         selected.headers,
+        reuseMcpSession,
       )
       if (!out.ok) {
         setCallError(out.error)
         setCallDiagnostics(out.diagnostics ?? null)
+        setCallHttpTrace(out.httpTrace ?? null)
         return
       }
       setCallResult(out.result)
+      setCallHttpTrace(out.httpTrace ?? null)
     } catch (e) {
       setCallError(e instanceof Error ? e.message : String(e))
       setCallDiagnostics(null)
+      setCallHttpTrace(null)
     } finally {
       setCallLoading(false)
     }
-  }, [selected?.url, selected?.headers, selectedTool, toolArgsJson, argsMode, schemaFields, formValues, t])
+  }, [
+    selected?.url,
+    selected?.headers,
+    selectedTool,
+    toolArgsJson,
+    argsMode,
+    schemaFields,
+    formValues,
+    reuseMcpSession,
+    t,
+  ])
 
   const statusLabel =
     connection === 'idle'
@@ -426,13 +454,13 @@ export function ToolsPanel() {
       ) : (
         <div className="flex min-h-0 flex-1">
           <section className="flex w-[min(100%,24rem)] shrink-0 flex-col border-r border-zinc-200/90 bg-white/50 dark:border-white/[0.06] dark:bg-zinc-950/30">
-            <div className="flex h-10 shrink-0 items-center border-b border-zinc-200/80 bg-zinc-50/90 px-4 dark:border-white/[0.04] dark:bg-zinc-950/40">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-zinc-200/80 bg-zinc-50/90 px-4 dark:border-white/[0.04] dark:bg-zinc-950/40">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
                 {t('tools.sectionTools')}
               </span>
               {connection === 'ok' && tools.length > 0 ? (
                 <span
-                  className="ml-2 rounded bg-zinc-200/90 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
+                  className="shrink-0 rounded bg-zinc-200/90 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
                   title={
                     toolListQuery.trim()
                       ? t('tools.filterCountTitle', { total: tools.length })
@@ -440,6 +468,40 @@ export function ToolsPanel() {
                   }
                 >
                   {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
+                </span>
+              ) : null}
+              <span className="min-w-0 flex-1" aria-hidden />
+              {selected ? (
+                <span
+                  className="flex shrink-0 items-center gap-1.5"
+                  title={t('tools.sessionReuseTitle')}
+                >
+                  <span className="hidden max-w-[4.5rem] truncate text-[9px] font-medium uppercase leading-tight tracking-wide text-zinc-500 dark:text-zinc-600 sm:inline">
+                    {t('tools.sessionReuseShort')}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={reuseMcpSession}
+                    aria-label={t('tools.sessionReuseTitle')}
+                    onClick={() => {
+                      const next = !reuseMcpSession
+                      setReuseMcpSession(next)
+                      if (selected.url) void fetchForUrl(selected.url, selected.headers)
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 ${
+                      reuseMcpSession
+                        ? 'bg-cyan-500 dark:bg-cyan-600'
+                        : 'bg-zinc-300 dark:bg-zinc-600'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                        reuseMcpSession ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                      aria-hidden
+                    />
+                  </button>
                 </span>
               ) : null}
             </div>
@@ -554,12 +616,12 @@ export function ToolsPanel() {
               <EmptyHint title={t('tools.emptyNoTool')} detail={t('tools.emptyNoToolDetail')} />
             ) : (
               <div className="space-y-5">
-                <div>
-                  <h2 className="select-none text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+                <div className="select-text">
+                  <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                     {selectedTool.name}
                   </h2>
                   {selectedTool.description ? (
-                    <p className="mt-2 select-none text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                       {selectedTool.description}
                     </p>
                   ) : null}
@@ -772,14 +834,43 @@ export function ToolsPanel() {
                   </button>
                   {callError ? (
                     <div className="mt-3 select-none rounded-xl border border-red-300/80 bg-red-50 p-4 text-xs leading-relaxed text-red-900 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-100/95">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-red-800 dark:text-red-200/90">
+                          {t('tools.callErrorTitle')}
+                        </span>
+                        {callHttpTrace
+                          ? (
+                            <button
+                              type="button"
+                              onClick={() => setHttpDetailOpen(true)}
+                              className="shrink-0 rounded-lg border border-red-300/80 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-red-900 transition hover:bg-red-100/80 dark:border-red-500/35 dark:bg-red-950/50 dark:text-red-100 dark:hover:bg-red-900/40"
+                            >
+                              {t('tools.viewHttpDetail')}
+                            </button>
+                          )
+                          : null}
+                      </div>
                       <pre className="overflow-x-auto whitespace-pre-wrap">{callError}</pre>
                       {callDiagnostics ? <McpConnectDiagnosticsBlock d={callDiagnostics} /> : null}
                     </div>
                   ) : null}
                   {callResult !== null && !callError ? (
                     <div className="mt-3">
-                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                        {t('tools.resultTitle')}
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
+                          {t('tools.resultTitle')}
+                        </span>
+                        {callHttpTrace
+                          ? (
+                            <button
+                              type="button"
+                              onClick={() => setHttpDetailOpen(true)}
+                              className="shrink-0 rounded-lg border border-zinc-200/90 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition hover:border-cyan-500/35 hover:bg-cyan-50/50 hover:text-cyan-900 dark:border-white/[0.08] dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:border-cyan-500/25 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-100"
+                            >
+                              {t('tools.viewHttpDetail')}
+                            </button>
+                          )
+                          : null}
                       </div>
                       <pre className="max-h-[min(24rem,50vh)] overflow-auto rounded-xl border border-zinc-200/90 bg-emerald-50/80 p-4 text-xs leading-relaxed text-emerald-950 shadow-inner dark:border-white/[0.06] dark:bg-zinc-900/60 dark:text-emerald-100/90">
                         {(() => {
@@ -801,6 +892,11 @@ export function ToolsPanel() {
         </section>
         </div>
       )}
+      <ToolCallHttpDetailModal
+        open={httpDetailOpen}
+        trace={callHttpTrace}
+        onClose={() => setHttpDetailOpen(false)}
+      />
     </main>
   )
 }

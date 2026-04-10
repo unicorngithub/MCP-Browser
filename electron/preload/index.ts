@@ -6,12 +6,18 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  SetMcpServersResult,
 } from '../../shared/types'
 import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 
 /** 与 `electron/main/update.ts` 中 `ipcMain.handle` 名称一致 */
-const UPDATER_INVOKE_CHANNELS = new Set<string>(['check-update', 'start-download', 'quit-and-install'])
+const UPDATER_INVOKE_CHANNELS = new Set<string>([
+  'check-update',
+  'cancel-check-update',
+  'start-download',
+  'quit-and-install',
+])
 
 /** 与 `electron/main/update.ts` 中 `webContents.send` / `event.sender.send` 频道一致 */
 const UPDATER_ON_CHANNELS = new Set<string>([
@@ -45,19 +51,20 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
   getServers(): Promise<MCPServer[]> {
     return ipcRenderer.invoke('mcp:get-servers')
   },
-  setServers(list: MCPServer[]): Promise<void> {
+  setServers(list: MCPServer[]): Promise<SetMcpServersResult> {
     return ipcRenderer.invoke('mcp:set-servers', list)
   },
-  fetchToolsList(url: string, headers?: MCPHttpHeader[]): Promise<FetchToolsResult> {
-    return ipcRenderer.invoke('mcp:fetch-tools', url, headers ?? [])
+  fetchToolsList(url: string, headers?: MCPHttpHeader[], reuseSession?: boolean): Promise<FetchToolsResult> {
+    return ipcRenderer.invoke('mcp:fetch-tools', url, headers ?? [], reuseSession === true)
   },
   callTool(
     url: string,
     toolName: string,
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
+    reuseSession?: boolean,
   ): Promise<CallToolResult> {
-    return ipcRenderer.invoke('mcp:call-tool', url, toolName, args, headers ?? [])
+    return ipcRenderer.invoke('mcp:call-tool', url, toolName, args, headers ?? [], reuseSession === true)
   },
   exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult> {
     return ipcRenderer.invoke('mcp:export-servers-json', opts ?? {})
@@ -98,6 +105,11 @@ contextBridge.exposeInMainWorld('appShellMenu', {
     const wrap = () => handler()
     ipcRenderer.on('app-menu:check-for-updates', wrap)
     return () => ipcRenderer.removeListener('app-menu:check-for-updates', wrap)
+  },
+  onUsageGuideRequest(handler: () => void): () => void {
+    const wrap = () => handler()
+    ipcRenderer.on('app-menu:usage-guide', wrap)
+    return () => ipcRenderer.removeListener('app-menu:usage-guide', wrap)
   },
 })
 

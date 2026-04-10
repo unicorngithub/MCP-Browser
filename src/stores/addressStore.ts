@@ -16,8 +16,13 @@ interface AddressState {
   replaceAllServers: (list: MCPServer[]) => Promise<void>
 }
 
-async function persist(list: MCPServer[]) {
-  await window.mcpDesktop.setServers(list)
+async function persist(list: MCPServer[]): Promise<boolean> {
+  const r = await window.mcpDesktop.setServers(list)
+  if (!r.ok) {
+    console.error('[addressStore] 持久化端点列表失败', r.error)
+    return false
+  }
+  return true
 }
 
 function normalizePersistedHeaders(headers: MCPHttpHeader[] | undefined): MCPHttpHeader[] {
@@ -57,7 +62,7 @@ export const useAddressStore = create<AddressState>((set, get) => ({
       ...(h.length ? { headers: h } : {}),
     }
     const next = [server, ...get().servers]
-    await persist(next)
+    if (!(await persist(next))) return
     set({ servers: next, selectedId: server.id })
   },
 
@@ -74,14 +79,14 @@ export const useAddressStore = create<AddressState>((set, get) => ({
         ...(h.length ? { headers: h } : {}),
       }
     })
-    await persist(next)
+    if (!(await persist(next))) return
     set({ servers: next })
   },
 
   removeServer: async (id) => {
     const { servers, selectedId } = get()
     const next = servers.filter(s => s.id !== id)
-    await persist(next)
+    if (!(await persist(next))) return
     const newSel = selectedId === id ? next[0]?.id ?? null : selectedId
     set({ servers: next, selectedId: newSel })
   },
@@ -98,12 +103,12 @@ export const useAddressStore = create<AddressState>((set, get) => ({
     const [item] = next.splice(fromIndex, 1)
     const insertAt = fromIndex < beforeIndex ? beforeIndex - 1 : beforeIndex
     next.splice(insertAt, 0, item)
-    await persist(next)
+    if (!(await persist(next))) return
     set({ servers: next })
   },
 
   replaceAllServers: async (list) => {
-    await persist(list)
+    if (!(await persist(list))) return
     set({ servers: list, selectedId: list[0]?.id ?? null })
   },
 }))

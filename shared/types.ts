@@ -67,16 +67,36 @@ export type FetchToolsResult =
   | { ok: true; tools: MCPTool[] }
   | { ok: false; error: string; diagnostics?: McpConnectDiagnostics }
 
+/** 单次 tools/call 对应的 HTTP 请求/响应原文（供「查看详情」） */
+export interface McpToolCallHttpTrace {
+  request: {
+    method: string
+    url: string
+    /** 按名称排序的多行 "Name: Value" */
+    headersText: string
+    body: string
+  }
+  response: {
+    status: number
+    statusText: string
+    headersText: string
+    body: string
+  } | null
+}
+
 /** tools/call 的返回（result 为服务端原始 JSON-RPC result） */
 export type CallToolResult =
-  | { ok: true; result: unknown }
-  | { ok: false; error: string; diagnostics?: McpConnectDiagnostics }
+  | { ok: true; result: unknown; httpTrace?: McpToolCallHttpTrace }
+  | { ok: false; error: string; diagnostics?: McpConnectDiagnostics; httpTrace?: McpToolCallHttpTrace }
 
 export type ExportServersJsonResult = { ok: true } | { ok: false; error: string }
 
 export type ImportServersJsonResult =
   | { ok: true; servers: MCPServer[]; count: number }
   | { ok: false; error: string }
+
+/** `mcp:set-servers`：校验通过并已写入 store，或拒绝写入并附带原因 */
+export type SetMcpServersResult = { ok: true } | { ok: false; error: string }
 
 /** 更新弹框 i18n：主进程在 IPC 中附带，渲染进程用 t(`update.error${Key}`) 等映射 */
 export type UpdateErrorUiKey = 'not_packaged' | 'network' | 'download_failed'

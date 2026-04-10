@@ -46,8 +46,8 @@ jobs:
       - name: Test build
         run: pnpm run pretest
 
-      - name: Vitest
-        run: pnpm exec vitest run
+      - name: Vitest (unit)
+        run: pnpm exec vitest run --exclude test/e2e.spec.ts
 
       - name: Package
         run: pnpm build

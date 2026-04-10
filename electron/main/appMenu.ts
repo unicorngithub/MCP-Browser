@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron'
+import { openExternalUrlIfAllowed } from './openExternalPolicy'
 import type { MenuItemConstructorOptions } from 'electron'
 import {
   escapeHtml,
@@ -256,13 +257,10 @@ function openNonMacAboutWindow(): void {
   })
 
   win.webContents.on('will-navigate', (e, url) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      e.preventDefault()
-      void shell.openExternal(url)
-    }
+    if (openExternalUrlIfAllowed(url)) e.preventDefault()
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) void shell.openExternal(url)
+    void openExternalUrlIfAllowed(url)
     return { action: 'deny' }
   })
 
@@ -320,21 +318,10 @@ function sendCheckForUpdatesRequest(): void {
   if (w && !w.isDestroyed()) w.webContents.send('app-menu:check-for-updates')
 }
 
-function showUsageTips(): void {
-  const s = shellStrings()
-  const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-  const opts = {
-    type: 'info' as const,
-    title: s.usageDialogTitle,
-    message: 'MCP BROWSER',
-    detail: s.usageDialogDetail,
-    buttons: [s.dialogOk],
-    noLink: true,
-  }
-  void import('electron').then(({ dialog }) => {
-    if (parent) void dialog.showMessageBox(parent, opts)
-    else void dialog.showMessageBox(opts)
-  })
+/** 使用说明改由渲染进程弹层展示，与主界面主题（浅/深）一致 */
+function sendOpenUsageGuideRequest(): void {
+  const w = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+  if (w && !w.isDestroyed()) w.webContents.send('app-menu:usage-guide')
 }
 
 /**
@@ -479,7 +466,7 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
         { type: 'separator' },
         {
           label: s.usageGuide,
-          click: showUsageTips,
+          click: sendOpenUsageGuideRequest,
         },
         { type: 'separator' },
         {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ServerSidebar } from '@/components/mcp/ServerSidebar'
 import Update from '@/components/update'
+import { UsageGuideModal } from '@/components/usage/UsageGuideModal'
 import { McpServersImportExport } from '@/components/mcp/McpServersImportExport'
 import { ServerDialog } from '@/components/mcp/ServerDialog'
 import { ToolsPanel } from '@/components/mcp/ToolsPanel'
@@ -15,6 +16,7 @@ export default function App() {
   const servers = useAddressStore((s) => s.servers)
   const selectedId = useAddressStore((s) => s.selectedId)
   const fetchForUrl = useToolsStore((s) => s.fetchForUrl)
+  const reuseMcpSession = useToolsStore((s) => s.reuseMcpSession)
 
   const [dialog, setDialog] = useState<{
     mode: 'add' | 'edit'
@@ -29,7 +31,7 @@ export default function App() {
 
   useEffect(() => {
     void fetchForUrl(selected?.url ?? null, selected?.headers)
-  }, [selected, fetchForUrl])
+  }, [selected, fetchForUrl, reuseMcpSession])
 
   const onSave = useCallback(
     async (name: string, url: string, headers: MCPHttpHeader[]) => {
@@ -67,6 +69,7 @@ export default function App() {
         onSave={onSave}
       />
       <McpServersImportExport />
+      <UsageGuideModal />
       <Update />
     </div>
   )

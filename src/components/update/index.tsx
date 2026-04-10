@@ -1,6 +1,6 @@
 import type { ProgressInfo } from 'electron-updater'
 import type { TFunction } from 'i18next'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from '@/components/update/Modal'
 import Progress from '@/components/update/Progress'
@@ -22,6 +22,7 @@ function updateErrorLines(err: ErrorType, t: TFunction): { primary: string; tech
 
 const Update = () => {
   const { t } = useTranslation()
+  const checkCancelledRef = useRef(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [checkPending, setCheckPending] = useState(false)
   const [versionInfo, setVersionInfo] = useState<VersionInfo>()
@@ -39,6 +40,7 @@ const Update = () => {
   })
 
   const checkUpdate = useCallback(async () => {
+    checkCancelledRef.current = false
     setCheckPending(true)
     setUpdateError(undefined)
     setVersionInfo(undefined)
@@ -49,10 +51,14 @@ const Update = () => {
       cancelText: t('update.cancel'),
       okText: t('update.close'),
       onCancel: () => {
+        checkCancelledRef.current = true
+        void window.updaterIpc.invoke('cancel-check-update')
         setModalOpen(false)
         setCheckPending(false)
       },
       onOk: () => {
+        checkCancelledRef.current = true
+        void window.updaterIpc.invoke('cancel-check-update')
         setModalOpen(false)
         setCheckPending(false)
       },
@@ -60,7 +66,10 @@ const Update = () => {
     const result = (await window.updaterIpc.invoke('check-update')) as
       | import('electron-updater').UpdateCheckResult
       | null
-      | { error?: ErrorType }
+      | { error?: ErrorType; cancelled?: boolean }
+    if (checkCancelledRef.current || (result && typeof result === 'object' && 'cancelled' in result && result.cancelled)) {
+      return
+    }
     if (result && typeof result === 'object' && 'error' in result) {
       const raw = result as { message?: string; error: unknown; uiKey?: ErrorType['uiKey'] }
       if (raw.error instanceof Error) {
@@ -90,6 +99,9 @@ const Update = () => {
   }, [checkUpdate])
 
   const onUpdateCanAvailable = useCallback((_event: Electron.IpcRendererEvent, arg1: VersionInfo) => {
+    if (arg1.silentCheck && !arg1.update) return
+    if (!arg1.silentCheck && checkCancelledRef.current) return
+
     setCheckPending(false)
     setVersionInfo(arg1)
     setUpdateError(undefined)
@@ -102,6 +114,7 @@ const Update = () => {
         onOk: () => void window.updaterIpc.invoke('start-download'),
       }))
       setUpdateAvailable(true)
+      if (arg1.silentCheck) setModalOpen(true)
     } else {
       setUpdateAvailable(false)
       setModalBtn(state => ({

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import { useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { DIALOG_SELECT_SURFACE_ATTR, useDialogAccessibility } from '@/lib/useDialogAccessibility'
 
 type ModalProps = {
   open: boolean
@@ -12,6 +14,8 @@ type ModalProps = {
   onOk?: () => void
   /** 用于 aria-labelledby */
   titleId?: string
+  /** 为 true 时可通过右下角拖拽调整宽高（仅用于内容较多的弹层，如 HTTP 详情） */
+  resizable?: boolean
 }
 
 /**
@@ -27,11 +31,25 @@ export default function UpdateModal({
   onCancel,
   onOk,
   titleId = 'mcp-update-dialog-title',
+  resizable = false,
 }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogAccessibility(open, dialogRef, () => {
+    if (onCancel) onCancel()
+    else onOk?.()
+  })
+
   if (!open) return null
 
   const sameFooterLabel =
     Boolean(cancelText && okText && cancelText === okText)
+
+  const shellClassName = [
+    'flex min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white/95 shadow-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-zinc-900/95 dark:shadow-dialog',
+    resizable
+      ? 'resize min-h-[220px] min-w-[min(100%,18rem)] h-[min(68vh,640px)] w-[min(36rem,94vw)] max-h-[min(92vh,900px)] max-w-[min(96vw,72rem)]'
+      : 'max-h-[min(90vh,720px)] w-full max-w-lg',
+  ].join(' ')
 
   return createPortal(
     <div
@@ -42,13 +60,14 @@ export default function UpdateModal({
       }}
     >
       <div
-        className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200/90 bg-white/95 shadow-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-zinc-900/95 dark:shadow-dialog"
+        ref={dialogRef}
+        className={shellClassName}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-zinc-200/90 px-6 pb-4 pt-5 dark:border-white/[0.06]">
+        <div className="shrink-0 select-none border-b border-zinc-200/90 px-6 pb-4 pt-5 dark:border-white/[0.06]">
           {title
             ? (
               <h2
@@ -61,11 +80,16 @@ export default function UpdateModal({
             : null}
         </div>
 
-        <div className="px-6 py-5 text-sm text-zinc-700 dark:text-zinc-300">{children}</div>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto select-text px-6 py-5 text-sm text-zinc-700 dark:text-zinc-300"
+          {...{ [DIALOG_SELECT_SURFACE_ATTR]: '' }}
+        >
+          {children}
+        </div>
 
         {footer === undefined
           ? (
-            <div className="flex justify-end gap-2 border-t border-zinc-200/90 px-6 py-4 dark:border-white/[0.06]">
+            <div className="flex shrink-0 select-none justify-end gap-2 border-t border-zinc-200/90 px-6 py-4 dark:border-white/[0.06]">
               {sameFooterLabel
                 ? (
                   <button
@@ -97,7 +121,7 @@ export default function UpdateModal({
             </div>
           )
           : (
-            footer
+            <div className="shrink-0 select-none">{footer}</div>
           )}
       </div>
     </div>,

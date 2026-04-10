@@ -7,6 +7,7 @@
   "license": "MIT",
   "private": true,
   "pnpm": {
+    "//overrides.builder-util-runtime": "锁定 9.5.1：electron-builder / electron-updater 传递依赖里 builder-util-runtime 版本若不统一，可能出现构建或运行时异常。升级 electron-builder 后可先删掉 overrides 再 pnpm i && pnpm build 验证；通过即可删除本 override。",
     "onlyBuiltDependencies": [
       "electron",
       "esbuild"
@@ -30,7 +31,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "pretest": "vite build --mode=test",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/e2e.spec.ts",
+    "test:e2e": "vitest run test/e2e.spec.ts",
     "test:update-screenshots": "node scripts/test-update-screenshots.mjs"
   },
   "dependencies": {
