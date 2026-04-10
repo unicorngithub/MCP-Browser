@@ -30,6 +30,9 @@ export default function UpdateModal({
 }: ModalProps) {
   if (!open) return null
 
+  const sameFooterLabel =
+    Boolean(cancelText && okText && cancelText === okText)
+
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm dark:bg-black/60"
@@ -63,20 +66,34 @@ export default function UpdateModal({
         {footer === undefined
           ? (
             <div className="flex justify-end gap-2 border-t border-zinc-200/90 px-6 py-4 dark:border-white/[0.06]">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
-              >
-                {cancelText ?? ''}
-              </button>
-              <button
-                type="button"
-                onClick={onOk}
-                className="rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-500/15 transition hover:brightness-110"
-              >
-                {okText ?? ''}
-              </button>
+              {sameFooterLabel
+                ? (
+                  <button
+                    type="button"
+                    onClick={onOk ?? onCancel}
+                    className="rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-500/15 transition hover:brightness-110"
+                  >
+                    {okText}
+                  </button>
+                )
+                : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onCancel}
+                      className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
+                    >
+                      {cancelText ?? ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOk}
+                      className="rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-500/15 transition hover:brightness-110"
+                    >
+                      {okText ?? ''}
+                    </button>
+                  </>
+                )}
             </div>
           )
           : (

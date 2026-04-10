@@ -10,7 +10,10 @@
     "onlyBuiltDependencies": [
       "electron",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "builder-util-runtime": "9.5.1"
+    }
   },
   "debug": {
     "env": {
