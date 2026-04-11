@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { MCPHttpHeader, MCPServer } from '@shared/types'
+import { DIALOG_SELECT_SURFACE_ATTR, useDialogAccessibility } from '@/lib/useDialogAccessibility'
 
 type Mode = 'add' | 'edit'
 
@@ -47,6 +48,8 @@ function serverToRows(server: MCPServer | null): HeaderRow[] {
 
 export function ServerDialog({ open, mode, server, onClose, onSave }: ServerDialogProps) {
   const { t } = useTranslation()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogAccessibility(open, dialogRef, onClose)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [headerRows, setHeaderRows] = useState<HeaderRow[]>([])
@@ -109,21 +112,28 @@ export function ServerDialog({ open, mode, server, onClose, onSave }: ServerDial
       onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}
     >
       <div
+        ref={dialogRef}
         className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200/90 bg-white/95 p-6 shadow-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-zinc-900/95 dark:shadow-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="mcp-server-dialog-title"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <h2
-          id="mcp-server-dialog-title"
-          className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white"
-        >
-          {mode === 'add' ? t('dialog.addTitle') : t('dialog.editTitle')}
-        </h2>
-        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-500">{t('dialog.endpointHelp')}</p>
+        <div className="select-none">
+          <h2
+            id="mcp-server-dialog-title"
+            className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white"
+          >
+            {mode === 'add' ? t('dialog.addTitle') : t('dialog.editTitle')}
+          </h2>
+          <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-500">{t('dialog.endpointHelp')}</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-6 flex select-text flex-col gap-4"
+          {...{ [DIALOG_SELECT_SURFACE_ATTR]: '' }}
+        >
           <label className="flex flex-col gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
             <span className="text-xs font-medium text-zinc-500">{t('dialog.labelName')}</span>
             <input
@@ -209,7 +219,7 @@ export function ServerDialog({ open, mode, server, onClose, onSave }: ServerDial
               {error}
             </p>
           ) : null}
-          <div className="mt-2 flex justify-end gap-2 border-t border-zinc-200/90 pt-5 dark:border-white/[0.06]">
+          <div className="mt-2 flex select-none justify-end gap-2 border-t border-zinc-200/90 pt-5 dark:border-white/[0.06]">
             <button
               type="button"
               onClick={onClose}

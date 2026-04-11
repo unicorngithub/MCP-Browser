@@ -67,8 +67,6 @@ export type AppShellStrings = {
   aboutDialogTitle: string
   /** 非 macOS「关于」窗口正文（HTML 片段，含 {{version}}、{{repoUrl}}；链接由主进程包装） */
   aboutWindowBodyHtml: string
-  usageDialogTitle: string
-  usageDialogDetail: string
   dialogOk: string
   dialogExportServersTitle: string
   dialogImportServersTitle: string
@@ -117,9 +115,6 @@ const ZH: AppShellStrings = {
   aboutDialogTitle: '关于 MCP Browser',
   aboutWindowBodyHtml:
     '<p class="meta">版本 {{version}}</p><p>由 Guo\'s 维护。许可条款见 LICENSE；上游模板署名见 NOTICE。</p><p class="repo"><span class="repo-label">源代码仓库：</span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>本软件依据 MCP 公开规范与远端服务通信；完整规范可通过菜单「帮助」打开。</p>',
-  usageDialogTitle: '使用说明',
-  usageDialogDetail:
-    '在侧栏添加并选择 MCP（HTTP）端点后，将按协议拉取 tools 列表，并展示各工具说明与入参结构（inputSchema）。\n\n通过菜单「文件」可导出或导入 MCP 端点配置 JSON，用于迁移或备份。\n\n外观等系统级选项位于菜单栏「设置」；其他系统配置亦将归集于此。',
   dialogOk: '确定',
   dialogExportServersTitle: '导出 MCP 端点配置',
   dialogImportServersTitle: '导入 MCP 端点配置',
@@ -168,9 +163,6 @@ const EN: AppShellStrings = {
   aboutDialogTitle: 'About MCP Browser',
   aboutWindowBodyHtml:
     '<p class="meta">Version {{version}}</p><p>Maintained by Guo\'s. Licensing terms are in LICENSE; upstream template credits are in NOTICE.</p><p class="repo"><span class="repo-label">Source repository: </span><a href="{{repoUrl}}" class="repo-link">{{repoUrl}}</a></p><p>This application communicates with remote services according to the public MCP specification; the full spec is available from the Help menu.</p>',
-  usageDialogTitle: 'User Guide',
-  usageDialogDetail:
-    'Add and select an MCP (HTTP) endpoint in the sidebar to fetch the tools list per the protocol and inspect each tool’s description and input schema (inputSchema).\n\nUse File → Export/Import MCP endpoint configuration JSON for migration or backup.\n\nAppearance and other system-wide options are under the Settings menu.',
   dialogOk: 'OK',
   dialogExportServersTitle: 'Export MCP endpoint configuration',
   dialogImportServersTitle: 'Import MCP endpoint configuration',

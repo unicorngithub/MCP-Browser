@@ -1,0 +1,30 @@
+# 手动触发：在 Windows 上再跑一遍 E2E（PR 已在 Ubuntu + xvfb 上跑真 E2E，见 ci.yml）。
+name: E2E
+
+on:
+  workflow_dispatch:
+
+jobs:
+  electron-e2e:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Test build
+        run: pnpm run pretest
+
+      - name: E2E
+        run: pnpm run test:e2e

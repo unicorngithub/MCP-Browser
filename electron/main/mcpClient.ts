@@ -1,4 +1,12 @@
 import { app } from 'electron'
+import {
+  getValidCachedSession,
+  invalidateMcpSessionCacheKey,
+  makeMcpSessionCacheKey,
+  putCachedSession,
+  runExclusiveSessionOpen,
+  touchCachedSession,
+} from './mcpSessionCache'
 import type {
   CallToolResult,
   FetchToolsResult,
@@ -6,6 +14,7 @@ import type {
   MCPTool,
   McpConnectDiagnostics,
   McpConnectStep,
+  McpToolCallHttpTrace,
 } from '../../shared/types'
 
 const CLIENT_NAME = 'mcp-browser'
@@ -148,6 +157,48 @@ async function sendInitializedNotification(
   return { ok: false, status: res.status, detail: t.slice(0, 300) }
 }
 
+function sortHeaderLinesFromRecord(h: Record<string, string>): string {
+  return Object.entries(h)
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'accent' }))
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n')
+}
+
+function sortHeaderLinesFromFetchHeaders(headers: Headers): string {
+  return [...headers.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'accent' }))
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n')
+}
+
+function parseRpcFromRaw(
+  status: number,
+  contentType: string,
+  raw: string,
+  rpcId: number,
+  httpOk: boolean,
+): {
+  status: number
+  result?: unknown
+  error?: { message: string; code?: number }
+  httpError?: string
+} {
+  const messages = extractJsonRpcMessages(contentType, raw)
+  const picked = pickByRpcId(messages, rpcId)
+  if (picked?.error) return { status, error: picked.error }
+  if (picked?.result !== undefined) return { status, result: picked.result }
+  if (!httpOk) {
+    return {
+      status,
+      httpError: `HTTP ${status}：${raw.slice(0, 400)}`,
+    }
+  }
+  return {
+    status,
+    httpError: `无法解析 JSON-RPC 响应（id=${rpcId}）：${raw.slice(0, 400)}`,
+  }
+}
+
 async function readRpcResult(
   res: Response,
   rpcId: number,
@@ -160,20 +211,7 @@ async function readRpcResult(
   const status = res.status
   const raw = await res.text()
   const ct = res.headers.get('content-type') ?? ''
-  const messages = extractJsonRpcMessages(ct, raw)
-  const picked = pickByRpcId(messages, rpcId)
-  if (picked?.error) return { status, error: picked.error }
-  if (picked?.result !== undefined) return { status, result: picked.result }
-  if (!res.ok) {
-    return {
-      status,
-      httpError: `HTTP ${res.status}：${raw.slice(0, 400)}`,
-    }
-  }
-  return {
-    status,
-    httpError: `无法解析 JSON-RPC 响应（id=${rpcId}）：${raw.slice(0, 400)}`,
-  }
+  return parseRpcFromRaw(status, ct, raw, rpcId, res.ok)
 }
 
 function connDiag(
@@ -327,20 +365,62 @@ async function openMcpSession(
   return { ok: true, href, sessionId, signal, sessionToClose }
 }
 
+type AcquiredSession =
+  | { ok: true; href: string; sessionId: string | null; cacheKey: string }
+  | { ok: false; error: string; diagnostics: McpConnectDiagnostics }
+
+async function acquireSession(
+  href: string,
+  userHeaders: Record<string, string>,
+  reuseSession: boolean,
+): Promise<AcquiredSession> {
+  const cacheKey = makeMcpSessionCacheKey(href, userHeaders)
+
+  if (!reuseSession) {
+    invalidateMcpSessionCacheKey(cacheKey)
+    const r = await openMcpSession(href, userHeaders)
+    if (!r.ok) return r
+    return { ok: true, href: r.href, sessionId: r.sessionId, cacheKey }
+  }
+
+  const hit = getValidCachedSession(cacheKey)
+  if (hit) {
+    touchCachedSession(cacheKey)
+    return { ok: true, href: hit.href, sessionId: hit.sessionId, cacheKey }
+  }
+
+  const r = await runExclusiveSessionOpen(cacheKey, async () => {
+    const opened = await openMcpSession(href, userHeaders)
+    if (opened.ok) {
+      putCachedSession(cacheKey, {
+        href: opened.href,
+        sessionId: opened.sessionId,
+        userHeaders: { ...userHeaders },
+      })
+    }
+    return opened
+  })
+
+  if (!r.ok) return r
+  return { ok: true, href: r.href, sessionId: r.sessionId, cacheKey }
+}
+
 export async function fetchMcpToolsList(
   endpoint: string,
   extraHeaders?: MCPHttpHeader[],
+  reuseSession = false,
 ): Promise<FetchToolsResult> {
   const parsed = parseMcpEndpoint(endpoint)
   if (!parsed.ok) return parsed
 
   const userHeaders = mcpHeadersToRecord(extraHeaders)
 
-  const session = await openMcpSession(parsed.href, userHeaders)
+  const session = await acquireSession(parsed.href, userHeaders, reuseSession)
   if (!session.ok) return { ok: false, error: session.error, diagnostics: session.diagnostics }
 
-  const { href, sessionId, signal, sessionToClose } = session
+  const { href, sessionId, cacheKey } = session
   const hadSidForList = !!(sessionId && sessionId.length > 0)
+  const opSignal = AbortSignal.timeout(60_000)
 
   try {
     let listRes: Response
@@ -349,11 +429,12 @@ export async function fetchMcpToolsList(
         href,
         { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
         sessionId,
-        signal,
+        opSignal,
         userHeaders,
       )
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
+      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
       return {
         ok: false,
         error: message,
@@ -363,6 +444,7 @@ export async function fetchMcpToolsList(
 
     const listRead = await readRpcResult(listRes, 2)
     if (listRead.error) {
+      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
       return {
         ok: false,
         error: `tools/list 失败：${listRead.error.message}`,
@@ -370,6 +452,7 @@ export async function fetchMcpToolsList(
       }
     }
     if (listRead.httpError && listRead.result === undefined) {
+      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
       return {
         ok: false,
         error: listRead.httpError,
@@ -378,16 +461,21 @@ export async function fetchMcpToolsList(
     }
 
     const tools = normalizeTools(listRead.result)
+    if (reuseSession) touchCachedSession(cacheKey)
     return { ok: true, tools }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
+    if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
     return {
       ok: false,
       error: message,
       diagnostics: connDiag('tools/list', null, hadSidForList, message),
     }
   } finally {
-    closeMcpSession(href, sessionToClose, userHeaders)
+    if (!reuseSession) {
+      closeMcpSession(href, sessionId, userHeaders)
+      invalidateMcpSessionCacheKey(cacheKey)
+    }
   }
 }
 
@@ -396,6 +484,7 @@ export async function callMcpTool(
   toolName: string,
   args: Record<string, unknown>,
   extraHeaders?: MCPHttpHeader[],
+  reuseSession = false,
 ): Promise<CallToolResult> {
   const parsed = parseMcpEndpoint(endpoint)
   if (!parsed.ok) return parsed
@@ -405,60 +494,95 @@ export async function callMcpTool(
 
   const userHeaders = mcpHeadersToRecord(extraHeaders)
 
-  const session = await openMcpSession(parsed.href, userHeaders)
+  const session = await acquireSession(parsed.href, userHeaders, reuseSession)
   if (!session.ok) return { ok: false, error: session.error, diagnostics: session.diagnostics }
 
-  const { href, sessionId, signal, sessionToClose } = session
+  const { href, sessionId, cacheKey } = session
   const hadSidForCall = !!(sessionId && sessionId.length > 0)
+  const opSignal = AbortSignal.timeout(60_000)
+
+  const TOOLS_CALL_RPC_ID = 3
 
   try {
+    const mergedHeaders = mergePostHeaders(userHeaders, sessionId)
+    const bodyObj = {
+      jsonrpc: '2.0' as const,
+      id: TOOLS_CALL_RPC_ID,
+      method: 'tools/call' as const,
+      params: { name, arguments: args },
+    }
+    const bodyStr = JSON.stringify(bodyObj)
+    const reqTrace: McpToolCallHttpTrace['request'] = {
+      method: 'POST',
+      url: href,
+      headersText: sortHeaderLinesFromRecord(mergedHeaders),
+      body: bodyStr,
+    }
+
     let callRes: Response
     try {
-      callRes = await mcpPost(
-        href,
-        {
-          jsonrpc: '2.0',
-          id: 3,
-          method: 'tools/call',
-          params: { name, arguments: args },
-        },
-        sessionId,
-        signal,
-        userHeaders,
-      )
+      callRes = await fetch(href, {
+        method: 'POST',
+        headers: mergedHeaders,
+        body: bodyStr,
+        signal: opSignal,
+      })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
+      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
       return {
         ok: false,
         error: message,
         diagnostics: connDiag('tools/call', null, hadSidForCall, message),
+        httpTrace: { request: reqTrace, response: null },
       }
     }
 
-    const callRead = await readRpcResult(callRes, 3)
+    const responseText = await callRes.text()
+    const ct = callRes.headers.get('content-type') ?? ''
+    const httpTrace: McpToolCallHttpTrace = {
+      request: reqTrace,
+      response: {
+        status: callRes.status,
+        statusText: callRes.statusText,
+        headersText: sortHeaderLinesFromFetchHeaders(callRes.headers),
+        body: responseText,
+      },
+    }
+
+    const callRead = parseRpcFromRaw(callRes.status, ct, responseText, TOOLS_CALL_RPC_ID, callRes.ok)
     if (callRead.error) {
+      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
       return {
         ok: false,
         error: `tools/call 失败：${callRead.error.message}`,
         diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.error.message),
+        httpTrace,
       }
     }
     if (callRead.httpError && callRead.result === undefined) {
+      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
       return {
         ok: false,
         error: callRead.httpError,
         diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.httpError),
+        httpTrace,
       }
     }
-    return { ok: true, result: callRead.result }
+    if (reuseSession) touchCachedSession(cacheKey)
+    return { ok: true, result: callRead.result, httpTrace }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
+    if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
     return {
       ok: false,
       error: message,
       diagnostics: connDiag('tools/call', null, hadSidForCall, message),
     }
   } finally {
-    closeMcpSession(href, sessionToClose, userHeaders)
+    if (!reuseSession) {
+      closeMcpSession(href, sessionId, userHeaders)
+      invalidateMcpSessionCacheKey(cacheKey)
+    }
   }
 }

@@ -26,7 +26,8 @@
   #root textarea,
   #root [contenteditable='true'],
   #root pre,
-  #root code {
+  #root code,
+  #root .mcp-devtools-json-preview {
     @apply select-text;
   }
 
@@ -49,5 +50,22 @@
   /* 统一按钮/输入默认可读性（配合 Tailwind preflight） */
   button {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  /**
+   * tools/call 预览 JSON 树：偏紧凑，接近 Network Preview 默认密度（约 11px / 14px）
+   */
+  .mcp-devtools-json-preview {
+    font-family:
+      menlo,
+      consolas,
+      'ubuntu mono',
+      'liberation mono',
+      'courier new',
+      monospace;
+    font-size: 11px;
+    line-height: 14px;
   }
 }

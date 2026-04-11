@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 import { createRequire } from 'node:module'
@@ -8,6 +8,7 @@ import os from 'node:os'
 import { update } from './update'
 import { registerMcpIpc } from './ipcMcp'
 import { installAppMenu, syncNativeThemeSource } from './appMenu'
+import { openExternalUrlIfAllowed } from './openExternalPolicy'
 
 registerMcpIpc()
 
@@ -89,9 +90,9 @@ async function createWindow() {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
   })
 
-  // Make all links open with the browser, not with the application
+  // 新窗口链接交给系统浏览器；https 任意，http 仅本机回环
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https:')) shell.openExternal(url)
+    void openExternalUrlIfAllowed(url)
     return { action: 'deny' }
   })
 

@@ -7,6 +7,7 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  SetMcpServersResult,
 } from '../shared/types'
 
 import type { AppLanguage } from '../shared/locale'
@@ -23,17 +24,19 @@ export interface AppLocaleApi {
 
 export interface AppShellMenuApi {
   onCheckForUpdatesRequest(handler: () => void): () => void
+  onUsageGuideRequest(handler: () => void): () => void
 }
 
 export interface McpDesktopApi {
   getServers(): Promise<MCPServer[]>
-  setServers(list: MCPServer[]): Promise<void>
-  fetchToolsList(url: string, headers?: MCPHttpHeader[]): Promise<FetchToolsResult>
+  setServers(list: MCPServer[]): Promise<SetMcpServersResult>
+  fetchToolsList(url: string, headers?: MCPHttpHeader[], reuseSession?: boolean): Promise<FetchToolsResult>
   callTool(
     url: string,
     toolName: string,
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
+    reuseSession?: boolean,
   ): Promise<CallToolResult>
   exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult>
   importServersJson(): Promise<ImportServersJsonResult>
@@ -41,7 +44,11 @@ export interface McpDesktopApi {
 }
 
 /** 与 `electron/main/update.ts`、`electron/preload` 白名单保持一致 */
-export type UpdaterInvokeChannel = 'check-update' | 'start-download' | 'quit-and-install'
+export type UpdaterInvokeChannel =
+  | 'check-update'
+  | 'cancel-check-update'
+  | 'start-download'
+  | 'quit-and-install'
 export type UpdaterOnChannel =
   | 'update-can-available'
   | 'update-error'

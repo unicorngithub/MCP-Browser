@@ -3,12 +3,17 @@ import { promises as fs } from 'node:fs'
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
 import { getAppShellStrings } from '../../shared/appShellStrings'
 import { MCP_IPC_USER_CANCELLED } from '../../shared/mcpIpc'
-import { buildMcpServersExportPayload, parseMcpServersImportJson } from '../../shared/mcpServersJson'
+import {
+  buildMcpServersExportPayload,
+  parseMcpServersImportJson,
+  parseMcpServersSetList,
+} from '../../shared/mcpServersJson'
 import type {
   ExportServersJsonResult,
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  SetMcpServersResult,
 } from '../../shared/types'
 import { getMenuLanguage } from './appMenu'
 import { getMcpServers, setMcpServers } from './mcpStore'
@@ -38,22 +43,29 @@ export function registerMcpIpc(): void {
     }
   })
 
-  ipcMain.handle('mcp:set-servers', (_evt, list: unknown) => {
+  ipcMain.handle('mcp:set-servers', (_evt, list: unknown): SetMcpServersResult => {
     try {
-      if (!Array.isArray(list)) return
-      setMcpServers(list as MCPServer[])
+      const parsed = parseMcpServersSetList(list)
+      if (!parsed.ok) {
+        console.error('[mcp:set-servers]', parsed.error)
+        return { ok: false, error: parsed.error }
+      }
+      setMcpServers(parsed.servers)
+      return { ok: true }
     } catch (e) {
       console.error('[mcp:set-servers]', e)
+      return { ok: false, error: '保存失败' }
     }
   })
 
-  ipcMain.handle('mcp:fetch-tools', async (_evt, url: unknown, headers: unknown) => {
+  ipcMain.handle('mcp:fetch-tools', async (_evt, url: unknown, headers: unknown, reuseSession: unknown) => {
     try {
       if (typeof url !== 'string') {
         return { ok: false, error: '参数无效' } as const
       }
       const h = parseHeadersIpc(headers)
-      return await fetchMcpToolsList(url, h)
+      const reuse = reuseSession === true
+      return await fetchMcpToolsList(url, h, reuse)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       return { ok: false, error: message } as const
@@ -62,7 +74,7 @@ export function registerMcpIpc(): void {
 
   ipcMain.handle(
     'mcp:call-tool',
-    async (_evt, url: unknown, toolName: unknown, args: unknown, headers: unknown) => {
+    async (_evt, url: unknown, toolName: unknown, args: unknown, headers: unknown, reuseSession: unknown) => {
       try {
         if (typeof url !== 'string' || typeof toolName !== 'string') {
           return { ok: false, error: '参数无效' } as const
@@ -71,7 +83,8 @@ export function registerMcpIpc(): void {
           return { ok: false, error: 'arguments 须为 JSON 对象' } as const
         }
         const h = parseHeadersIpc(headers)
-        return await callMcpTool(url, toolName, args as Record<string, unknown>, h)
+        const reuse = reuseSession === true
+        return await callMcpTool(url, toolName, args as Record<string, unknown>, h, reuse)
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
         return { ok: false, error: message } as const

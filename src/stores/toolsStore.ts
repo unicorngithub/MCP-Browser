@@ -11,7 +11,11 @@ interface ToolsState {
   lastUrl: string | null
   lastHeaders: MCPHttpHeader[] | undefined
   selectedToolName: string | null
-  fetchForUrl: (url: string | null, headers?: MCPHttpHeader[]) => Promise<void>
+  fetchForUrl: (
+    url: string | null,
+    headers?: MCPHttpHeader[],
+    reuseMcpSession?: boolean,
+  ) => Promise<void>
   setSelectedTool: (name: string | null) => void
   clear: () => void
 }
@@ -25,7 +29,7 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
   lastHeaders: undefined,
   selectedToolName: null,
 
-  fetchForUrl: async (url, headers) => {
+  fetchForUrl: async (url, headers, reuseMcpSession = false) => {
     if (!url) {
       set({
         tools: [],
@@ -49,7 +53,7 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
     })
 
     try {
-      const result = await window.mcpDesktop.fetchToolsList(url, headers)
+      const result = await window.mcpDesktop.fetchToolsList(url, headers, reuseMcpSession)
       if (get().lastUrl !== url) return
 
       if (!result.ok) {

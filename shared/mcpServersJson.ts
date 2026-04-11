@@ -37,6 +37,63 @@ function isValidHttpUrl(url: string): boolean {
   }
 }
 
+/**
+ * 主进程 `mcp:set-servers`：校验渲染进程提交的列表，全部合法才应落盘（保留各条 id）。
+ * 与导入解析一致：name 可省略或空串时用 url；createdAt 非法时用当前时间。
+ */
+export function parseMcpServersSetList(
+  list: unknown,
+): { ok: true; servers: MCPServer[] } | { ok: false; error: string } {
+  if (!Array.isArray(list)) return { ok: false, error: '须为数组' }
+
+  const seenIds = new Set<string>()
+  const servers: MCPServer[] = []
+
+  for (let i = 0; i < list.length; i++) {
+    const row = list[i]
+    const ord = i + 1
+    if (!isRecord(row)) return { ok: false, error: `第 ${ord} 条须为对象` }
+
+    const id = typeof row.id === 'string' ? row.id.trim() : ''
+    if (!id) return { ok: false, error: `第 ${ord} 条：id 须为非空字符串` }
+    if (seenIds.has(id)) return { ok: false, error: `第 ${ord} 条：重复的 id（${id}）` }
+    seenIds.add(id)
+
+    const url = typeof row.url === 'string' ? row.url.trim() : ''
+    if (!url || !isValidHttpUrl(url)) {
+      return { ok: false, error: `第 ${ord} 条：url 须为有效 http(s) 地址` }
+    }
+
+    const nameRaw = typeof row.name === 'string' ? row.name.trim() : ''
+    const name = nameRaw || url
+
+    const createdAt =
+      typeof row.createdAt === 'number' && Number.isFinite(row.createdAt) ? row.createdAt : Date.now()
+
+    if (row.headers != null && !Array.isArray(row.headers)) {
+      return { ok: false, error: `第 ${ord} 条：headers 须为数组或省略` }
+    }
+    if (
+      row.reuseMcpSession != null &&
+      typeof row.reuseMcpSession !== 'boolean'
+    ) {
+      return { ok: false, error: `第 ${ord} 条：reuseMcpSession 须为布尔或省略` }
+    }
+    const headers = parseHeadersLoose(row.headers)
+
+    servers.push({
+      id,
+      name,
+      url,
+      createdAt,
+      ...(headers?.length ? { headers } : {}),
+      ...(row.reuseMcpSession === true ? { reuseMcpSession: true } : {}),
+    })
+  }
+
+  return { ok: true, servers }
+}
+
 /** 构建写入文件的导出对象（可选掩码请求头 value） */
 export function buildMcpServersExportPayload(
   servers: MCPServer[],
@@ -93,6 +150,7 @@ export function parseMcpServersImportJson(
       url,
       createdAt,
       ...(headers?.length ? { headers } : {}),
+      ...(item.reuseMcpSession === true ? { reuseMcpSession: true } : {}),
     }
     servers.push(entry)
   }

@@ -1,7 +1,8 @@
-import { Fragment, useCallback, useRef, useState } from 'react'
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MCPServer } from '@shared/types'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import UpdateModal from '@/components/update/Modal'
 import { useAddressStore } from '@/stores/addressStore'
 
 interface ServerSidebarProps {
@@ -14,6 +15,12 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const { servers, selectedId, select, removeServer, reorderServers, ready } = useAddressStore()
   const dragFromRef = useRef<number | null>(null)
   const [dropBefore, setDropBefore] = useState<number | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+  const pendingDelete = useMemo(
+    () => (pendingDeleteId ? servers.find((s) => s.id === pendingDeleteId) : undefined),
+    [servers, pendingDeleteId],
+  )
 
   const clearDrop = useCallback(() => setDropBefore(null), [])
 
@@ -58,6 +65,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const endDropBefore = servers.length
 
   return (
+    <>
     <aside className="flex h-full w-[17.5rem] shrink-0 flex-col border-r border-zinc-200/80 bg-white/70 shadow-[inset_-1px_0_0_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.06] dark:bg-zinc-950/80 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
       <div className="border-b border-zinc-200/80 px-4 pb-4 pt-2 dark:border-white/[0.06]">
         <div className="mb-1 flex items-center justify-between gap-2">
@@ -188,7 +196,7 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
                           title={t('sidebar.deleteTitle')}
                           onClick={(e) => {
                             e.stopPropagation()
-                            void removeServer(s.id)
+                            setPendingDeleteId(s.id)
                           }}
                           className="rounded-md px-2 py-1 text-[11px] text-zinc-600 transition hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400"
                         >
@@ -256,5 +264,26 @@ export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
         )}
       </div>
     </aside>
+    <UpdateModal
+      open={pendingDeleteId !== null}
+      title={t('sidebar.deleteConfirmTitle')}
+      titleId="sidebar-delete-confirm-title"
+      cancelText={t('sidebar.deleteConfirmCancel')}
+      okText={t('sidebar.deleteConfirmAction')}
+      onCancel={() => setPendingDeleteId(null)}
+      onOk={() => {
+        const id = pendingDeleteId
+        setPendingDeleteId(null)
+        if (id) void removeServer(id)
+      }}
+    >
+      <p className="whitespace-pre-wrap break-words leading-relaxed">
+        {t('sidebar.deleteConfirmDetail', {
+          name: pendingDelete?.name ?? '',
+          url: pendingDelete?.url ?? '',
+        })}
+      </p>
+    </UpdateModal>
+    </>
   )
 }
