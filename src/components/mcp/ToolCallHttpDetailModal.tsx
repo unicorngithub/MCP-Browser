@@ -12,6 +12,10 @@ function formatBodyText(raw: string): string {
   }
 }
 
+/** 请求/响应的头、体共用：无内部滚动条，由弹层整体滚动；长行换行。 */
+const HTTP_TRACE_PRE =
+  'whitespace-pre-wrap break-words rounded-lg border border-zinc-200/90 bg-zinc-100/90 p-3 font-mono text-[11px] leading-relaxed text-zinc-900 dark:border-white/[0.06] dark:bg-zinc-900/70 dark:text-zinc-200'
+
 type Props = {
   open: boolean
   trace: McpToolCallHttpTrace | null
@@ -50,13 +54,13 @@ export function ToolCallHttpDetailModal({ open, trace, onClose }: Props) {
               <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-600">
                 {t('tools.httpRequestHeaders')}
               </div>
-              <pre className="mb-3 max-h-40 overflow-auto rounded-lg border border-zinc-200/90 bg-zinc-100/90 p-3 font-mono text-[11px] leading-relaxed text-zinc-900 dark:border-white/[0.06] dark:bg-zinc-900/70 dark:text-zinc-200">
+              <pre className={`${HTTP_TRACE_PRE} mb-3`}>
                 {req.headersText || '—'}
               </pre>
               <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-600">
                 {t('tools.httpRequestBody')}
               </div>
-              <pre className="max-h-48 overflow-auto rounded-lg border border-zinc-200/90 bg-zinc-100/90 p-3 font-mono text-[11px] leading-relaxed text-zinc-900 dark:border-white/[0.06] dark:bg-zinc-900/70 dark:text-zinc-200">
+              <pre className={HTTP_TRACE_PRE}>
                 {formatBodyText(req.body) || '—'}
               </pre>
             </section>
@@ -81,13 +85,13 @@ export function ToolCallHttpDetailModal({ open, trace, onClose }: Props) {
                 <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-600">
                   {t('tools.httpResponseHeaders')}
                 </div>
-                <pre className="mb-3 max-h-40 overflow-auto rounded-lg border border-zinc-200/90 bg-zinc-100/90 p-3 font-mono text-[11px] leading-relaxed text-zinc-900 dark:border-white/[0.06] dark:bg-zinc-900/70 dark:text-zinc-200">
+                <pre className={`${HTTP_TRACE_PRE} mb-3`}>
                   {res.headersText || '—'}
                 </pre>
                 <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-600">
                   {t('tools.httpResponseBody')}
                 </div>
-                <pre className="max-h-[min(40vh,20rem)] overflow-auto rounded-lg border border-zinc-200/90 bg-zinc-100/90 p-3 font-mono text-[11px] leading-relaxed text-zinc-900 dark:border-white/[0.06] dark:bg-zinc-900/70 dark:text-zinc-200">
+                <pre className={HTTP_TRACE_PRE}>
                   {formatBodyText(res.body) || '—'}
                 </pre>
               </>

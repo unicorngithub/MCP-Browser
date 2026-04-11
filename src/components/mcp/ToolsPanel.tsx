@@ -10,6 +10,8 @@ import {
   initialFormValues,
   parseMcpToolInputSchema,
 } from '@/lib/mcpInputSchema'
+import { expandMcpToolResultForPreview, safeJsonStringify } from '@/lib/mcpToolResultPreview'
+import { McpJsonPreview } from '@/components/mcp/McpJsonPreview'
 
 function EmptyHint({ title, detail }: { title: string; detail?: string }) {
   return (
@@ -36,6 +38,35 @@ function ToolbarIcon({
     <span className={`inline-flex h-4 w-4 shrink-0 items-center justify-center ${className}`}>
       {children}
     </span>
+  )
+}
+
+/** 打开 HTTP 调用详情：仅图标，避免与结果区正文抢视觉；`label` 用于 aria 与 title。 */
+function HttpTraceDetailIconButton({
+  variant,
+  onClick,
+  label,
+}: {
+  variant: 'neutral' | 'error'
+  onClick: () => void
+  label: string
+}) {
+  const tone =
+    variant === 'error'
+      ? 'text-red-800/80 hover:bg-red-200/40 hover:text-red-950 dark:text-red-200/80 dark:hover:bg-red-900/35 dark:hover:text-red-50'
+      : 'text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-800 dark:text-zinc-500 dark:hover:bg-white/[0.08] dark:hover:text-zinc-200'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition ${tone}`}
+    >
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-3.5 w-3.5 opacity-90">
+        <path d="M4 2h5.172a1 1 0 01.707.293l2.828 2.828A1 1 0 0113 5.828V13a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 1.5v9h6V6.5H8.5a1 1 0 01-1-1V3.5H5zm4.5-.207L9.207 3.5H8.5V4.5h1.5zM5.5 7.5h5v1h-5v-1zm0 2h5v1h-5v-1zm0 2h3v1h-3v-1z" />
+      </svg>
+    </button>
   )
 }
 
@@ -148,6 +179,9 @@ export function ToolsPanel() {
   const [callError, setCallError] = useState<string | null>(null)
   const [callDiagnostics, setCallDiagnostics] = useState<McpConnectDiagnostics | null>(null)
   const [callResult, setCallResult] = useState<unknown>(null)
+  const [callResultTab, setCallResultTab] = useState<'preview' | 'response'>('preview')
+  /** 每次成功调用递增，用于重置 JSON 树折叠状态 */
+  const [jsonPreviewEpoch, setJsonPreviewEpoch] = useState(0)
   const [callHttpTrace, setCallHttpTrace] = useState<McpToolCallHttpTrace | null>(null)
   const [httpDetailOpen, setHttpDetailOpen] = useState(false)
   const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
@@ -175,6 +209,8 @@ export function ToolsPanel() {
     setCallError(null)
     setCallDiagnostics(null)
     setCallResult(null)
+    setCallResultTab('preview')
+    setJsonPreviewEpoch(0)
     setCallHttpTrace(null)
     setHttpDetailOpen(false)
     setInputSchemaOpen(true)
@@ -205,6 +241,20 @@ export function ToolsPanel() {
     if (filteredTools.some((t) => t.name === selectedToolName)) return filteredTools
     return [selected, ...filteredTools]
   }, [tools, filteredTools, selectedToolName])
+
+  /** Preview 用数据：展开 content[].text 内嵌 JSON，供树状高亮组件渲染 */
+  const callResultPreviewData = useMemo(
+    () => (callResult !== null ? expandMcpToolResultForPreview(callResult) : null),
+    [callResult],
+  )
+
+  /** Response：HTTP 原始响应正文（如整段 JSON、SSE）；无 trace 时回退为与预览相同 */
+  const callResultResponseText = useMemo(() => {
+    if (callResult === null) return ''
+    const raw = callHttpTrace?.response?.body
+    if (typeof raw === 'string' && raw.length > 0) return raw
+    return safeJsonStringify(callResult, 2)
+  }, [callHttpTrace, callResult])
 
   const setFormField = useCallback((key: string, value: string) => {
     setFormValues((prev) => ({ ...prev, [key]: value }))
@@ -237,6 +287,7 @@ export function ToolsPanel() {
     setCallError(null)
     setCallDiagnostics(null)
     setCallResult(null)
+    setCallResultTab('preview')
     setCallHttpTrace(null)
     setHttpDetailOpen(false)
     setCallLoading(true)
@@ -255,6 +306,7 @@ export function ToolsPanel() {
         return
       }
       setCallResult(out.result)
+      setJsonPreviewEpoch((n) => n + 1)
       setCallHttpTrace(out.httpTrace ?? null)
     } catch (e) {
       setCallError(e instanceof Error ? e.message : String(e))
@@ -833,18 +885,16 @@ export function ToolsPanel() {
                   {callError ? (
                     <div className="mt-3 select-none rounded-xl border border-red-300/80 bg-red-50 p-4 text-xs leading-relaxed text-red-900 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-100/95">
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-red-800 dark:text-red-200/90">
+                        <span className="text-xs font-medium text-red-800 dark:text-red-200/90">
                           {t('tools.callErrorTitle')}
                         </span>
                         {callHttpTrace
                           ? (
-                            <button
-                              type="button"
+                            <HttpTraceDetailIconButton
+                              variant="error"
                               onClick={() => setHttpDetailOpen(true)}
-                              className="shrink-0 rounded-lg border border-red-300/80 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-red-900 transition hover:bg-red-100/80 dark:border-red-500/35 dark:bg-red-950/50 dark:text-red-100 dark:hover:bg-red-900/40"
-                            >
-                              {t('tools.viewHttpDetail')}
-                            </button>
+                              label={t('tools.viewHttpDetail')}
+                            />
                           )
                           : null}
                       </div>
@@ -854,31 +904,84 @@ export function ToolsPanel() {
                   ) : null}
                   {callResult !== null && !callError ? (
                     <div className="mt-3">
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                           {t('tools.resultTitle')}
                         </span>
                         {callHttpTrace
                           ? (
-                            <button
-                              type="button"
+                            <HttpTraceDetailIconButton
+                              variant="neutral"
                               onClick={() => setHttpDetailOpen(true)}
-                              className="shrink-0 rounded-lg border border-zinc-200/90 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition hover:border-cyan-500/35 hover:bg-cyan-50/50 hover:text-cyan-900 dark:border-white/[0.08] dark:bg-zinc-900/60 dark:text-zinc-300 dark:hover:border-cyan-500/25 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-100"
-                            >
-                              {t('tools.viewHttpDetail')}
-                            </button>
+                              label={t('tools.viewHttpDetail')}
+                            />
                           )
                           : null}
                       </div>
-                      <pre className="max-h-[min(24rem,50vh)] overflow-auto rounded-xl border border-zinc-200/90 bg-emerald-50/80 p-4 text-xs leading-relaxed text-emerald-950 shadow-inner dark:border-white/[0.06] dark:bg-zinc-900/60 dark:text-emerald-100/90">
-                        {(() => {
-                          try {
-                            return JSON.stringify(callResult, null, 2)
-                          } catch {
-                            return String(callResult)
+                      <div className="overflow-hidden rounded-xl border border-zinc-200/90 shadow-inner dark:border-white/[0.06]">
+                        <div
+                          className="flex gap-0.5 border-b border-zinc-200/90 bg-zinc-100/90 p-1 dark:border-white/[0.06] dark:bg-zinc-900/50"
+                          role="tablist"
+                          aria-label={t('tools.resultTabsAria')}
+                        >
+                          <button
+                            type="button"
+                            role="tab"
+                            id="mcp-tool-call-tab-preview"
+                            aria-selected={callResultTab === 'preview'}
+                            aria-controls="mcp-tool-call-result-panel"
+                            onClick={() => setCallResultTab('preview')}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                              callResultTab === 'preview'
+                                ? 'bg-white text-[rgb(31_31_31)] shadow-sm ring-1 ring-inset ring-[rgb(218_220_224)] dark:bg-[#202124] dark:text-[rgb(227_227_227)] dark:ring-[rgb(60_64_67)]'
+                                : 'text-zinc-600 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            {t('tools.resultTabPreview')}
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            id="mcp-tool-call-tab-response"
+                            aria-selected={callResultTab === 'response'}
+                            aria-controls="mcp-tool-call-result-panel"
+                            onClick={() => setCallResultTab('response')}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                              callResultTab === 'response'
+                                ? 'bg-emerald-50/95 text-emerald-900 shadow-sm dark:bg-zinc-800/95 dark:text-emerald-100/95'
+                                : 'text-zinc-600 hover:bg-white/60 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            {t('tools.resultTabResponse')}
+                          </button>
+                        </div>
+                        <div
+                          id="mcp-tool-call-result-panel"
+                          role="tabpanel"
+                          aria-labelledby={
+                            callResultTab === 'preview'
+                              ? 'mcp-tool-call-tab-preview'
+                              : 'mcp-tool-call-tab-response'
                           }
-                        })()}
-                      </pre>
+                          className={`min-w-0 max-h-[min(24rem,50vh)] overflow-auto p-4 ${
+                            callResultTab === 'preview'
+                              ? 'bg-white dark:bg-[#202124]'
+                              : 'bg-emerald-50/80 dark:bg-zinc-900/60'
+                          }`}
+                        >
+                          {callResultTab === 'preview' && callResultPreviewData !== null ? (
+                            <McpJsonPreview
+                              key={jsonPreviewEpoch}
+                              value={callResultPreviewData}
+                              defaultCollapseDepth={3}
+                            />
+                          ) : (
+                            <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-emerald-950 dark:text-emerald-100/90">
+                              {callResultResponseText}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ) : null}
                     </div>
