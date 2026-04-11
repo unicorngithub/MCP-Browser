@@ -10,6 +10,7 @@ import {
   initialFormValues,
   parseMcpToolInputSchema,
 } from '@/lib/mcpInputSchema'
+import { formatToolCallResponseTabText } from '@/lib/mcpHttpResponseBodyDisplay'
 import { expandMcpToolResultForPreview, safeJsonStringify } from '@/lib/mcpToolResultPreview'
 import { McpJsonPreview } from '@/components/mcp/McpJsonPreview'
 
@@ -252,7 +253,7 @@ export function ToolsPanel() {
   const callResultResponseText = useMemo(() => {
     if (callResult === null) return ''
     const raw = callHttpTrace?.response?.body
-    if (typeof raw === 'string' && raw.length > 0) return raw
+    if (typeof raw === 'string' && raw.length > 0) return formatToolCallResponseTabText(raw)
     return safeJsonStringify(callResult, 2)
   }, [callHttpTrace, callResult])
 

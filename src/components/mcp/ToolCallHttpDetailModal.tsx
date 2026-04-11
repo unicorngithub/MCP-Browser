@@ -2,16 +2,6 @@ import type { McpToolCallHttpTrace } from '@shared/types'
 import { useTranslation } from 'react-i18next'
 import UpdateModal from '@/components/update/Modal'
 
-function formatBodyText(raw: string): string {
-  const t = raw.trim()
-  if (!t) return ''
-  try {
-    return JSON.stringify(JSON.parse(t) as unknown, null, 2)
-  } catch {
-    return raw
-  }
-}
-
 /** 请求/响应的头、体共用：无内部滚动条，由弹层整体滚动；长行换行。 */
 const HTTP_TRACE_PRE =
   'whitespace-pre-wrap break-words rounded-lg border border-zinc-200/90 bg-zinc-100/90 p-3 font-mono text-[11px] leading-relaxed text-zinc-900 dark:border-white/[0.06] dark:bg-zinc-900/70 dark:text-zinc-200'
@@ -61,7 +51,7 @@ export function ToolCallHttpDetailModal({ open, trace, onClose }: Props) {
                 {t('tools.httpRequestBody')}
               </div>
               <pre className={HTTP_TRACE_PRE}>
-                {formatBodyText(req.body) || '—'}
+                {req.body || '—'}
               </pre>
             </section>
           )
@@ -92,7 +82,7 @@ export function ToolCallHttpDetailModal({ open, trace, onClose }: Props) {
                   {t('tools.httpResponseBody')}
                 </div>
                 <pre className={HTTP_TRACE_PRE}>
-                  {formatBodyText(res.body) || '—'}
+                  {res.body || '—'}
                 </pre>
               </>
             )
