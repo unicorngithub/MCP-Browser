@@ -14,6 +14,8 @@ interface AddressState {
   reorderServers: (fromIndex: number, beforeIndex: number) => Promise<void>
   /** 用导入列表完全替换本地端点（会持久化） */
   replaceAllServers: (list: MCPServer[]) => Promise<void>
+  /** 更新该端点是否复用 MCP 会话（写入端点配置） */
+  setServerReuseMcpSession: (id: string, reuse: boolean) => Promise<void>
 }
 
 async function persist(list: MCPServer[]): Promise<boolean> {
@@ -110,5 +112,16 @@ export const useAddressStore = create<AddressState>((set, get) => ({
   replaceAllServers: async (list) => {
     if (!(await persist(list))) return
     set({ servers: list, selectedId: list[0]?.id ?? null })
+  },
+
+  setServerReuseMcpSession: async (id, reuse) => {
+    const next = get().servers.map((s) => {
+      if (s.id !== id) return s
+      const { reuseMcpSession: _r, ...rest } = s
+      if (reuse) return { ...rest, reuseMcpSession: true as const }
+      return rest
+    })
+    if (!(await persist(next))) return
+    set({ servers: next })
   },
 }))

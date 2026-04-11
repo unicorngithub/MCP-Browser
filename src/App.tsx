@@ -16,7 +16,6 @@ export default function App() {
   const servers = useAddressStore((s) => s.servers)
   const selectedId = useAddressStore((s) => s.selectedId)
   const fetchForUrl = useToolsStore((s) => s.fetchForUrl)
-  const reuseMcpSession = useToolsStore((s) => s.reuseMcpSession)
 
   const [dialog, setDialog] = useState<{
     mode: 'add' | 'edit'
@@ -30,8 +29,12 @@ export default function App() {
   }, [hydrate])
 
   useEffect(() => {
-    void fetchForUrl(selected?.url ?? null, selected?.headers)
-  }, [selected, fetchForUrl, reuseMcpSession])
+    void fetchForUrl(
+      selected?.url ?? null,
+      selected?.headers,
+      selected?.reuseMcpSession === true,
+    )
+  }, [selected, fetchForUrl])
 
   const onSave = useCallback(
     async (name: string, url: string, headers: MCPHttpHeader[]) => {

@@ -96,7 +96,7 @@
     "toolbarAria": "Connection and actions",
     "sectionTools": "Tools",
     "sessionReuseShort": "Reuse session",
-    "sessionReuseTitle": "When on, tools/list and tools/call for the same endpoint share one MCP session (fewer initialize handshakes). The cache expires after ~15 minutes idle. When off, each operation starts a fresh session.",
+    "sessionReuseTitle": "Saved per endpoint: when on, tools/list and tools/call reuse one MCP session for this server (fewer initialize handshakes) and the choice is stored in your local endpoint config. It persists across app restarts. Cache expires after ~15 minutes idle.",
     "filterCountTitle": "Filtered / {{total}} total",
     "totalCountTitle": "Total tools",
     "searchLabel": "Filter tools",

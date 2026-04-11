@@ -73,6 +73,7 @@ function unpackServer(row: McpServerDisk): MCPServer {
     url: row.url,
     createdAt: row.createdAt,
     ...(headers?.length ? { headers } : {}),
+    ...(typeof row.reuseMcpSession === 'boolean' && row.reuseMcpSession ? { reuseMcpSession: true } : {}),
   }
 }
 

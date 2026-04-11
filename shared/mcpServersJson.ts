@@ -73,6 +73,12 @@ export function parseMcpServersSetList(
     if (row.headers != null && !Array.isArray(row.headers)) {
       return { ok: false, error: `第 ${ord} 条：headers 须为数组或省略` }
     }
+    if (
+      row.reuseMcpSession != null &&
+      typeof row.reuseMcpSession !== 'boolean'
+    ) {
+      return { ok: false, error: `第 ${ord} 条：reuseMcpSession 须为布尔或省略` }
+    }
     const headers = parseHeadersLoose(row.headers)
 
     servers.push({
@@ -81,6 +87,7 @@ export function parseMcpServersSetList(
       url,
       createdAt,
       ...(headers?.length ? { headers } : {}),
+      ...(row.reuseMcpSession === true ? { reuseMcpSession: true } : {}),
     })
   }
 
@@ -143,6 +150,7 @@ export function parseMcpServersImportJson(
       url,
       createdAt,
       ...(headers?.length ? { headers } : {}),
+      ...(item.reuseMcpSession === true ? { reuseMcpSession: true } : {}),
     }
     servers.push(entry)
   }

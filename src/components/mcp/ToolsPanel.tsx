@@ -96,11 +96,13 @@ function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
 
 export function ToolsPanel() {
   const { t, i18n } = useTranslation()
-  const { servers, selectedId } = useAddressStore()
+  const { servers, selectedId, setServerReuseMcpSession } = useAddressStore()
   const selected = useMemo(
     () => servers.find((s) => s.id === selectedId) ?? null,
     [servers, selectedId],
   )
+
+  const reuseMcpSession = selected?.reuseMcpSession === true
 
   const {
     tools,
@@ -112,8 +114,6 @@ export function ToolsPanel() {
     selectedToolName,
     fetchForUrl,
     setSelectedTool,
-    reuseMcpSession,
-    setReuseMcpSession,
   } = useToolsStore()
 
   const toolTestHintComponents = useMemo(
@@ -246,7 +246,7 @@ export function ToolsPanel() {
         selectedTool.name,
         args,
         selected.headers,
-        reuseMcpSession,
+        selected.reuseMcpSession === true,
       )
       if (!out.ok) {
         setCallError(out.error)
@@ -266,12 +266,12 @@ export function ToolsPanel() {
   }, [
     selected?.url,
     selected?.headers,
+    selected?.reuseMcpSession,
     selectedTool,
     toolArgsJson,
     argsMode,
     schemaFields,
     formValues,
-    reuseMcpSession,
     t,
   ])
 
@@ -485,9 +485,7 @@ export function ToolsPanel() {
                     aria-checked={reuseMcpSession}
                     aria-label={t('tools.sessionReuseTitle')}
                     onClick={() => {
-                      const next = !reuseMcpSession
-                      setReuseMcpSession(next)
-                      if (selected.url) void fetchForUrl(selected.url, selected.headers)
+                      void setServerReuseMcpSession(selected.id, !reuseMcpSession)
                     }}
                     className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 ${
                       reuseMcpSession
