@@ -4,6 +4,9 @@ export interface MCPHttpHeader {
   value: string
 }
 
+/** MCP 远端 HTTP 传输：Streamable HTTP 或 HTTP/SSE */
+export type McpHttpTransport = 'streamable-http' | 'sse'
+
 /** 本地持久化的 MCP 服务配置 */
 export interface MCPServer {
   id: string
@@ -49,10 +52,17 @@ export interface JsonRpcError {
 
 /** MCP HTTP 流程中的步骤（与服务端日志对照） */
 export type McpConnectStep =
+  | 'headers'
   | 'initialize'
   | 'notifications/initialized'
   | 'tools/list'
   | 'tools/call'
+
+/** 渲染进程用 t(key, values) 展示；切换界面语言时无需重新请求即可更新文案 */
+export interface McpErrorI18n {
+  key: string
+  values?: Record<string, string | number>
+}
 
 /** 连接 / 请求失败时的分步诊断 */
 export interface McpConnectDiagnostics {
@@ -61,15 +71,13 @@ export interface McpConnectDiagnostics {
   httpStatus: number | null
   /** 该步请求所带或上一步响应是否已有 MCP-Session-Id（initialize 响应头是否返回会话） */
   hadSessionId: boolean
-  /** 简要说明（JSON-RPC message、响应体片段等） */
+  /** 简要说明（JSON-RPC message、响应体片段等）；有 detailI18n 时可为英文等兜底文案 */
   detail: string
+  /** 若存在，工具面板用当前语言翻译详情（与 detail 同义，可随语言切换） */
+  detailI18n?: McpErrorI18n
 }
 
-export type FetchToolsResult =
-  | { ok: true; tools: MCPTool[] }
-  | { ok: false; error: string; diagnostics?: McpConnectDiagnostics }
-
-/** 单次 tools/call 对应的 HTTP 请求/响应原文（供「查看详情」） */
+/** MCP HTTP 单次请求/响应原文（tools/call、连接失败步骤等） */
 export interface McpToolCallHttpTrace {
   request: {
     method: string
@@ -86,10 +94,27 @@ export interface McpToolCallHttpTrace {
   } | null
 }
 
+export type FetchToolsResult =
+  | { ok: true; tools: MCPTool[] }
+  | {
+      ok: false
+      error: string
+      errorI18n?: McpErrorI18n
+      diagnostics?: McpConnectDiagnostics
+      /** 失败步骤对应的 HTTP 请求/响应原文（无 HTTP 时仅有 request 或为空） */
+      httpTrace?: McpToolCallHttpTrace
+    }
+
 /** tools/call 的返回（result 为服务端原始 JSON-RPC result） */
 export type CallToolResult =
   | { ok: true; result: unknown; httpTrace?: McpToolCallHttpTrace }
-  | { ok: false; error: string; diagnostics?: McpConnectDiagnostics; httpTrace?: McpToolCallHttpTrace }
+  | {
+      ok: false
+      error: string
+      errorI18n?: McpErrorI18n
+      diagnostics?: McpConnectDiagnostics
+      httpTrace?: McpToolCallHttpTrace
+    }
 
 export type ExportServersJsonResult = { ok: true } | { ok: false; error: string }
 

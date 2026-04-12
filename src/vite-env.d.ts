@@ -7,6 +7,7 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  McpHttpTransport,
   SetMcpServersResult,
 } from '../shared/types'
 
@@ -30,13 +31,19 @@ export interface AppShellMenuApi {
 export interface McpDesktopApi {
   getServers(): Promise<MCPServer[]>
   setServers(list: MCPServer[]): Promise<SetMcpServersResult>
-  fetchToolsList(url: string, headers?: MCPHttpHeader[], reuseSession?: boolean): Promise<FetchToolsResult>
+  fetchToolsList(
+    url: string,
+    headers?: MCPHttpHeader[],
+    reuseSession?: boolean,
+    transport?: McpHttpTransport,
+  ): Promise<FetchToolsResult>
   callTool(
     url: string,
     toolName: string,
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
     reuseSession?: boolean,
+    transport?: McpHttpTransport,
   ): Promise<CallToolResult>
   exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult>
   importServersJson(): Promise<ImportServersJsonResult>

@@ -27,7 +27,7 @@
   "dialog": {
     "addTitle": "添加 MCP 端点",
     "editTitle": "编辑 MCP 端点",
-    "endpointHelp": "填写 Streamable HTTP 传输下的完整 MCP 端点 URL",
+    "endpointHelp": "填写 MCP 的 HTTP 端点 URL；传输方式在主界面工具栏选择。自定义请求头会用于握手与全部 JSON-RPC 请求。",
     "labelName": "显示名称",
     "labelUrl": "HTTP 端点 URL",
     "placeholderName": "示例：本地 MCP 服务",
@@ -78,6 +78,9 @@
     "selectAddressHint": "请在侧栏选择端点后，于此处查看工具",
     "toolCount": "{{count}} 个工具",
     "toolCountTitle": "当前端点返回的工具数量",
+    "httpTransportAria": "MCP HTTP 传输方式",
+    "httpTransportStreamable": "Streamable HTTP",
+    "httpTransportSse": "HTTP/SSE 传输",
     "connectionStatus": "与 MCP 服务端的连接状态",
     "statusIdle": "就绪",
     "statusLoading": "正在连接",
@@ -96,7 +99,7 @@
     "toolbarAria": "连接与操作",
     "sectionTools": "工具",
     "sessionReuseShort": "复用会话",
-    "sessionReuseTitle": "按当前端点保存：开启后，该端点的拉取工具列表与调用工具会复用 MCP 会话（减少 initialize 等握手），并写入本地端点配置；下次打开应用或切换回该端点仍有效。约 15 分钟无操作会过期并自动重建。",
+    "sessionReuseTitle": "按当前端点保存：开启后，该端点的拉取工具列表与调用工具会复用 MCP 会话（减少 initialize 等握手），并写入本地端点配置；下次打开应用或切换回该端点仍有效。约 15 分钟无操作会过期并自动重建。仅在使用 Streamable HTTP 传输时可用；HTTP/SSE 需保持独立 SSE 连接，不提供此项。",
     "filterCountTitle": "筛选结果 / 共 {{total}} 个",
     "totalCountTitle": "工具总数",
     "searchLabel": "筛选工具",
@@ -144,6 +147,7 @@
     "jsonPreviewCollapseNode": "折叠",
     "callErrorTitle": "调用失败",
     "viewHttpDetail": "查看详情",
+    "viewConnectionHttpRequest": "查看实际请求",
     "httpDetailTitle": "请求与响应详情",
     "httpRequestSection": "请求",
     "httpResponseSection": "响应",
@@ -163,6 +167,10 @@
     "diagInitNoSession": "否（响应头未返回 MCP-Session-Id）",
     "diagStepWithSession": "是（本步骤请求已携带 MCP-Session-Id）",
     "diagStepNoSession": "否（无有效会话，请求未携带 MCP-Session-Id）",
+    "stepHeaders": "请求头（客户端校验）",
+    "diagHeadersNoHttp": "不适用（尚未发出 HTTP 请求）",
+    "mcpHeaderNameInvalid": "第 {{row}} 行请求头的「名称」含有非 Latin-1 字符（如中文）。Electron/Chromium 无法在本地构造该 HTTP 头，请将名称改为仅含 ASCII（例如 Authorization、X-Api-Key）。",
+    "mcpHeaderValueInvalid": "请求头「{{name}}」的值含有非 Latin-1 字符（如中文）。请改为仅使用英文、数字与常见符号；若需传递其它数据请使用 Base64 等纯 ASCII 编码。",
     "stepInitialize": "initialize",
     "stepNotificationsInitialized": "notifications/initialized",
     "stepToolsList": "tools/list",
@@ -184,7 +192,7 @@
   },
   "usageGuide": {
     "title": "使用说明",
-    "content": "在侧栏添加并选择 MCP（HTTP）端点后，将按协议拉取 tools 列表，并展示各工具说明与入参结构（inputSchema）。\n\n通过菜单「文件」可导出或导入 MCP 端点配置 JSON，用于迁移或备份。\n\n外观等系统级选项位于菜单栏「设置」；其他系统配置亦将归集于此。"
+    "content": "在侧栏添加并选择 MCP（HTTP）端点后，将按协议拉取 tools 列表，并展示各工具说明与入参结构（inputSchema）。主界面工具栏可在 Streamable HTTP 与 HTTP/SSE 远程传输之间切换。\n\n通过菜单「文件」可导出或导入 MCP 端点配置 JSON，用于迁移或备份。\n\n外观等系统级选项位于菜单栏「设置」；其他系统配置亦将归集于此。"
   },
   "update": {
     "dialogTitle": "软件更新",

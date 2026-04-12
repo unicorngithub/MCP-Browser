@@ -7,7 +7,7 @@
   },
   "sidebar": {
     "title": "Endpoints & tools",
-    "subtitle": "Manage Streamable HTTP MCP endpoints and tools",
+    "subtitle": "Manage MCP HTTP endpoints and tools",
     "addAddress": "Add endpoint",
     "listHeading": "Endpoints",
     "loadingConfig": "Loading local configuration…",
@@ -27,7 +27,7 @@
   "dialog": {
     "addTitle": "Add MCP endpoint",
     "editTitle": "Edit MCP endpoint",
-    "endpointHelp": "Enter the full MCP endpoint URL for Streamable HTTP transport",
+    "endpointHelp": "Enter the MCP HTTP endpoint URL; choose the transport in the main toolbar. Custom headers apply to handshake and all JSON-RPC requests.",
     "labelName": "Display name",
     "labelUrl": "HTTP endpoint URL",
     "placeholderName": "e.g. Local MCP service",
@@ -78,6 +78,9 @@
     "selectAddressHint": "Choose an endpoint in the sidebar to inspect tools",
     "toolCount": "{{count}} tools",
     "toolCountTitle": "Tools returned for this endpoint",
+    "httpTransportAria": "MCP HTTP transport",
+    "httpTransportStreamable": "Streamable HTTP",
+    "httpTransportSse": "HTTP/SSE transport",
     "connectionStatus": "Connection status to the MCP server",
     "statusIdle": "Ready",
     "statusLoading": "Connecting",
@@ -96,7 +99,7 @@
     "toolbarAria": "Connection and actions",
     "sectionTools": "Tools",
     "sessionReuseShort": "Reuse session",
-    "sessionReuseTitle": "Saved per endpoint: when on, tools/list and tools/call reuse one MCP session for this server (fewer initialize handshakes) and the choice is stored in your local endpoint config. It persists across app restarts. Cache expires after ~15 minutes idle.",
+    "sessionReuseTitle": "Saved per endpoint: when on, tools/list and tools/call reuse one MCP session for this server (fewer initialize handshakes) and the choice is stored in your local endpoint config. It persists across app restarts. Cache expires after ~15 minutes idle. Only available with Streamable HTTP; HTTP/SSE requires a dedicated SSE connection and does not use this option.",
     "filterCountTitle": "Filtered / {{total}} total",
     "totalCountTitle": "Total tools",
     "searchLabel": "Filter tools",
@@ -144,6 +147,7 @@
     "jsonPreviewCollapseNode": "Collapse",
     "callErrorTitle": "Invocation failed",
     "viewHttpDetail": "View details",
+    "viewConnectionHttpRequest": "View actual request",
     "httpDetailTitle": "Request & response",
     "httpRequestSection": "Request",
     "httpResponseSection": "Response",
@@ -163,6 +167,10 @@
     "diagInitNoSession": "No (MCP-Session-Id not returned in headers)",
     "diagStepWithSession": "Yes (this step’s request included MCP-Session-Id)",
     "diagStepNoSession": "No (no active session; request omitted MCP-Session-Id)",
+    "stepHeaders": "Request headers (client check)",
+    "diagHeadersNoHttp": "N/A (no HTTP request was sent)",
+    "mcpHeaderNameInvalid": "Row {{row}}: the header name contains non-Latin-1 characters (e.g. CJK). Electron/Chromium cannot build this HTTP header locally. Use ASCII-only names (e.g. Authorization, X-Api-Key).",
+    "mcpHeaderValueInvalid": "The value of header \"{{name}}\" contains non-Latin-1 characters (e.g. CJK). Use only letters, digits, and common symbols, or encode payload as Base64 (ASCII-only).",
     "stepInitialize": "initialize",
     "stepNotificationsInitialized": "notifications/initialized",
     "stepToolsList": "tools/list",
@@ -184,7 +192,7 @@
   },
   "usageGuide": {
     "title": "User guide",
-    "content": "Add and select an MCP (HTTP) endpoint in the sidebar to fetch the tools list per the protocol and inspect each tool’s description and input schema (inputSchema).\n\nUse File → Export/Import MCP endpoint configuration JSON for migration or backup.\n\nAppearance and other system-wide options are under the Settings menu."
+    "content": "Add and select an MCP (HTTP) endpoint in the sidebar to fetch the tools list per the protocol and inspect each tool’s description and input schema (inputSchema). The main toolbar lets you switch between Streamable HTTP and HTTP/SSE remote transport.\n\nUse File → Export/Import MCP endpoint configuration JSON for migration or backup.\n\nAppearance and other system-wide options are under the Settings menu."
   },
   "update": {
     "dialogTitle": "Software update",

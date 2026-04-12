@@ -1,6 +1,20 @@
-import { useMemo, useState, useCallback, useEffect, type ReactNode } from 'react'
+import {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
+import type { TFunction } from 'i18next'
 import { Trans, useTranslation } from 'react-i18next'
-import type { McpConnectDiagnostics, McpConnectStep, McpToolCallHttpTrace } from '@shared/types'
+import type {
+  McpConnectDiagnostics,
+  McpConnectStep,
+  McpErrorI18n,
+  McpHttpTransport,
+  McpToolCallHttpTrace,
+} from '@shared/types'
 import { useAddressStore } from '@/stores/addressStore'
 import { useToolsStore } from '@/stores/toolsStore'
 import { ToolArgsForm } from '@/components/mcp/ToolArgsForm'
@@ -13,6 +27,31 @@ import {
 import { formatToolCallResponseTabText } from '@/lib/mcpHttpResponseBodyDisplay'
 import { expandMcpToolResultForPreview, safeJsonStringify } from '@/lib/mcpToolResultPreview'
 import { McpJsonPreview } from '@/components/mcp/McpJsonPreview'
+
+/** 主工具栏「HTTP 传输」与侧栏工具列表「匹配字段」下拉共用样式 */
+const MCP_PANEL_SELECT_CLASS =
+  'shrink-0 cursor-pointer rounded-lg border border-zinc-300 bg-white py-2 pl-2 pr-7 text-[11px] font-medium text-zinc-800 outline-none ring-cyan-500/25 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:text-zinc-200 dark:focus:border-cyan-500/35 disabled:cursor-not-allowed disabled:opacity-45'
+
+const MCP_PANEL_SELECT_STYLE: CSSProperties = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 0.4rem center',
+  appearance: 'none',
+}
+
+function resolveMcpErrorDisplay(
+  error: string | null,
+  errorI18n: McpErrorI18n | null | undefined,
+  t: TFunction,
+): string {
+  if (errorI18n?.key) return t(errorI18n.key, { ...(errorI18n.values ?? {}) })
+  return error ?? ''
+}
+
+function resolveMcpDiagDetail(d: McpConnectDiagnostics, t: TFunction): string {
+  if (d.detailI18n?.key) return t(d.detailI18n.key, { ...(d.detailI18n.values ?? {}) })
+  return d.detail
+}
 
 function EmptyHint({ title, detail }: { title: string; detail?: string }) {
   return (
@@ -72,6 +111,7 @@ function HttpTraceDetailIconButton({
 }
 
 const STEP_LABEL_KEYS: Record<McpConnectStep, string> = {
+  headers: 'tools.stepHeaders',
   initialize: 'tools.stepInitialize',
   'notifications/initialized': 'tools.stepNotificationsInitialized',
   'tools/list': 'tools.stepToolsList',
@@ -81,8 +121,11 @@ const STEP_LABEL_KEYS: Record<McpConnectStep, string> = {
 function mcpSessionIdHint(
   step: McpConnectStep,
   had: boolean,
-  tr: (key: string) => string,
+  tr: TFunction,
 ): string {
+  if (step === 'headers') {
+    return tr('tools.diagHeadersNoHttp')
+  }
   if (step === 'initialize') {
     return had ? tr('tools.diagInitWithSession') : tr('tools.diagInitNoSession')
   }
@@ -90,10 +133,7 @@ function mcpSessionIdHint(
 }
 
 /** 与界面诊断块一致，供剪贴板使用 */
-function formatConnectionDiagnosticsPlain(
-  d: McpConnectDiagnostics,
-  tr: (key: string) => string,
-): string {
+function formatConnectionDiagnosticsPlain(d: McpConnectDiagnostics, tr: TFunction): string {
   const http =
     d.httpStatus === null ? tr('tools.diagHttpNoResponse') : String(d.httpStatus)
   return [
@@ -101,7 +141,7 @@ function formatConnectionDiagnosticsPlain(
     `${tr('tools.diagFailStep')}: ${tr(STEP_LABEL_KEYS[d.step])}`,
     `${tr('tools.diagHttpStatus')}: ${http}`,
     `${tr('tools.diagSessionId')}: ${mcpSessionIdHint(d.step, d.hadSessionId, tr)}`,
-    `${tr('tools.diagDetail')}: ${d.detail}`,
+    `${tr('tools.diagDetail')}: ${resolveMcpDiagDetail(d, tr)}`,
   ].join('\n')
 }
 
@@ -120,7 +160,9 @@ function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
         <dt className="text-red-700 dark:text-red-400/90">{t('tools.diagSessionId')}</dt>
         <dd>{mcpSessionIdHint(d.step, d.hadSessionId, t)}</dd>
         <dt className="text-red-700 dark:text-red-400/90">{t('tools.diagDetail')}</dt>
-        <dd className="whitespace-pre-wrap break-all text-red-950 dark:text-red-50/90">{d.detail}</dd>
+        <dd className="whitespace-pre-wrap break-all text-red-950 dark:text-red-50/90">
+          {resolveMcpDiagDetail(d, t)}
+        </dd>
       </dl>
     </div>
   )
@@ -134,19 +176,25 @@ export function ToolsPanel() {
     [servers, selectedId],
   )
 
-  const reuseMcpSession = selected?.reuseMcpSession === true
-
   const {
     tools,
     connection,
     error,
+    errorI18n,
     connectDiagnostics,
+    connectHttpTrace,
     lastUrl,
     lastHeaders,
+    mcpHttpTransport,
+    setMcpHttpTransport,
     selectedToolName,
     fetchForUrl,
     setSelectedTool,
   } = useToolsStore()
+
+  const reuseMcpSession = selected?.reuseMcpSession === true
+  /** 与主进程一致：SSE 传输不缓存会话，请求层始终传 reuseSession=false */
+  const reuseMcpSessionEffective = reuseMcpSession && mcpHttpTransport !== 'sse'
 
   const toolTestHintComponents = useMemo(
     () => ({
@@ -178,6 +226,7 @@ export function ToolsPanel() {
   const [argsParseError, setArgsParseError] = useState<string | null>(null)
   const [callLoading, setCallLoading] = useState(false)
   const [callError, setCallError] = useState<string | null>(null)
+  const [callErrorI18n, setCallErrorI18n] = useState<McpErrorI18n | null>(null)
   const [callDiagnostics, setCallDiagnostics] = useState<McpConnectDiagnostics | null>(null)
   const [callResult, setCallResult] = useState<unknown>(null)
   const [callResultTab, setCallResultTab] = useState<'preview' | 'response'>('preview')
@@ -185,6 +234,7 @@ export function ToolsPanel() {
   const [jsonPreviewEpoch, setJsonPreviewEpoch] = useState(0)
   const [callHttpTrace, setCallHttpTrace] = useState<McpToolCallHttpTrace | null>(null)
   const [httpDetailOpen, setHttpDetailOpen] = useState(false)
+  const [connectHttpDetailOpen, setConnectHttpDetailOpen] = useState(false)
   const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
   const [toolTestOpen, setToolTestOpen] = useState(true)
   const [toolListQuery, setToolListQuery] = useState('')
@@ -208,6 +258,7 @@ export function ToolsPanel() {
     setArgsMode(schemaFields.length > 0 ? 'form' : 'json')
     setArgsParseError(null)
     setCallError(null)
+    setCallErrorI18n(null)
     setCallDiagnostics(null)
     setCallResult(null)
     setCallResultTab('preview')
@@ -286,6 +337,7 @@ export function ToolsPanel() {
     }
     setArgsParseError(null)
     setCallError(null)
+    setCallErrorI18n(null)
     setCallDiagnostics(null)
     setCallResult(null)
     setCallResultTab('preview')
@@ -298,10 +350,12 @@ export function ToolsPanel() {
         selectedTool.name,
         args,
         selected.headers,
-        selected.reuseMcpSession === true,
+        reuseMcpSessionEffective,
+        mcpHttpTransport,
       )
       if (!out.ok) {
         setCallError(out.error)
+        setCallErrorI18n(out.errorI18n ?? null)
         setCallDiagnostics(out.diagnostics ?? null)
         setCallHttpTrace(out.httpTrace ?? null)
         return
@@ -311,6 +365,7 @@ export function ToolsPanel() {
       setCallHttpTrace(out.httpTrace ?? null)
     } catch (e) {
       setCallError(e instanceof Error ? e.message : String(e))
+      setCallErrorI18n(null)
       setCallDiagnostics(null)
       setCallHttpTrace(null)
     } finally {
@@ -319,7 +374,8 @@ export function ToolsPanel() {
   }, [
     selected?.url,
     selected?.headers,
-    selected?.reuseMcpSession,
+    reuseMcpSessionEffective,
+    mcpHttpTransport,
     selectedTool,
     toolArgsJson,
     argsMode,
@@ -349,8 +405,25 @@ export function ToolsPanel() {
   const retry = useCallback(() => {
     const u = selected?.url ?? lastUrl
     const h = selected?.headers ?? lastHeaders
-    if (u) void fetchForUrl(u, h)
-  }, [selected?.url, selected?.headers, lastUrl, lastHeaders, fetchForUrl])
+    const st = useToolsStore.getState()
+    const tr = st.mcpHttpTransport
+    const reuse =
+      selected != null
+        ? selected.reuseMcpSession === true && tr !== 'sse'
+        : st.lastReuseMcpSession && tr !== 'sse'
+    if (u) void fetchForUrl(u, h, reuse)
+  }, [selected, lastUrl, lastHeaders, fetchForUrl])
+
+  const onHttpTransportChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const v = e.target.value as McpHttpTransport
+      setMcpHttpTransport(v)
+      if (!selected?.url) return
+      const reuse = selected.reuseMcpSession === true && v !== 'sse'
+      void fetchForUrl(selected.url, selected.headers, reuse)
+    },
+    [selected, setMcpHttpTransport, fetchForUrl],
+  )
 
   const copyUrl = useCallback(async () => {
     if (!selected?.url) return
@@ -364,8 +437,8 @@ export function ToolsPanel() {
   }, [selected?.url])
 
   const copyConnectionError = useCallback(async () => {
-    if (!error) return
-    let text = error
+    if (error == null && !errorI18n) return
+    let text = resolveMcpErrorDisplay(error, errorI18n, t)
     if (connectDiagnostics) {
       text += `\n\n${formatConnectionDiagnosticsPlain(connectDiagnostics, t)}`
     }
@@ -376,11 +449,12 @@ export function ToolsPanel() {
     } catch {
       /* 忽略 */
     }
-  }, [error, connectDiagnostics, t])
+  }, [error, errorI18n, connectDiagnostics, t])
 
   useEffect(() => {
     setCopyErrorDone(false)
-  }, [error, connectDiagnostics])
+    setConnectHttpDetailOpen(false)
+  }, [error, errorI18n, connectDiagnostics, connectHttpTrace])
 
   const showToolCount = Boolean(selected && connection === 'ok')
 
@@ -419,6 +493,23 @@ export function ToolsPanel() {
               {t('tools.toolCount', { count: tools.length })}
             </span>
           ) : null}
+
+          <label className="inline-flex min-w-0 items-center" htmlFor="mcp-http-transport-select">
+            <span className="sr-only">{t('tools.httpTransportAria')}</span>
+            <select
+              id="mcp-http-transport-select"
+              value={mcpHttpTransport}
+              onChange={onHttpTransportChange}
+              disabled={connection === 'loading'}
+              aria-label={t('tools.httpTransportAria')}
+              title={t('tools.httpTransportAria')}
+              className={`min-w-0 max-w-[10.5rem] sm:max-w-[14rem] ${MCP_PANEL_SELECT_CLASS}`}
+              style={MCP_PANEL_SELECT_STYLE}
+            >
+              <option value="streamable-http">{t('tools.httpTransportStreamable')}</option>
+              <option value="sse">{t('tools.httpTransportSse')}</option>
+            </select>
+          </label>
 
           <div
             className="hidden h-7 w-px bg-zinc-300/90 dark:bg-white/[0.08] sm:block"
@@ -480,23 +571,36 @@ export function ToolsPanel() {
         </div>
       </header>
 
-      {connection === 'error' && error ? (
+      {connection === 'error' && (error != null || errorI18n != null) ? (
         <div className="mx-4 mt-3 rounded-xl border border-red-300/80 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-md sm:mx-5 dark:border-red-500/25 dark:bg-red-950/35 dark:text-red-200/95 dark:shadow-lg dark:shadow-red-900/20">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-            <div className="min-w-0 flex-1 select-none whitespace-pre-wrap">{error}</div>
-            <button
-              type="button"
-              onClick={() => void copyConnectionError()}
-              title={t('tools.copyConnectionErrorTitle')}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-red-300/90 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 transition hover:border-red-400 hover:bg-red-100/80 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-200 dark:hover:border-red-400/60 dark:hover:bg-red-900/40"
-            >
-              <ToolbarIcon>
-                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-3.5 w-3.5 opacity-80">
-                  <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2v2a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm0 2v2h6a2 2 0 0 1 2 2v6h2V2H4zm2 4H2v8h8V8H6z" />
-                </svg>
-              </ToolbarIcon>
-              {copyErrorDone ? t('tools.copied') : t('tools.copyConnectionError')}
-            </button>
+            <div className="min-w-0 flex-1 select-none whitespace-pre-wrap">
+              {resolveMcpErrorDisplay(error, errorI18n, t)}
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2 self-start">
+              {connectHttpTrace
+                ? (
+                  <HttpTraceDetailIconButton
+                    variant="error"
+                    onClick={() => setConnectHttpDetailOpen(true)}
+                    label={t('tools.viewConnectionHttpRequest')}
+                  />
+                )
+                : null}
+              <button
+                type="button"
+                onClick={() => void copyConnectionError()}
+                title={t('tools.copyConnectionErrorTitle')}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-red-300/90 bg-white px-2.5 py-1.5 text-xs font-medium text-red-800 transition hover:border-red-400 hover:bg-red-100/80 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-200 dark:hover:border-red-400/60 dark:hover:bg-red-900/40"
+              >
+                <ToolbarIcon>
+                  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-3.5 w-3.5 opacity-80">
+                    <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2v2a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm0 2v2h6a2 2 0 0 1 2 2v6h2V2H4zm2 4H2v8h8V8H6z" />
+                  </svg>
+                </ToolbarIcon>
+                {copyErrorDone ? t('tools.copied') : t('tools.copyConnectionError')}
+              </button>
+            </div>
           </div>
           {connectDiagnostics ? <McpConnectDiagnosticsBlock d={connectDiagnostics} /> : null}
         </div>
@@ -524,7 +628,7 @@ export function ToolsPanel() {
                 </span>
               ) : null}
               <span className="min-w-0 flex-1" aria-hidden />
-              {selected ? (
+              {selected && mcpHttpTransport !== 'sse' ? (
                 <span
                   className="flex shrink-0 items-center gap-1.5"
                   title={t('tools.sessionReuseTitle')}
@@ -588,13 +692,8 @@ export function ToolsPanel() {
                     setToolListSearchField(e.target.value as 'name' | 'description' | 'both')
                   }
                   title={t('tools.fieldTitle')}
-                  className="shrink-0 cursor-pointer rounded-lg border border-zinc-300 bg-white py-2 pl-2 pr-7 text-[11px] font-medium text-zinc-800 outline-none ring-cyan-500/25 focus:border-cyan-500/50 focus:ring-2 dark:border-white/[0.08] dark:bg-zinc-900/70 dark:text-zinc-200 dark:focus:border-cyan-500/35"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.4rem center',
-                    appearance: 'none',
-                  }}
+                  className={MCP_PANEL_SELECT_CLASS}
+                  style={MCP_PANEL_SELECT_STYLE}
                 >
                   <option value="name">{t('tools.optionName')}</option>
                   <option value="description">{t('tools.optionDescription')}</option>
@@ -883,7 +982,7 @@ export function ToolsPanel() {
                       <>{t('tools.callButton')}</>
                     )}
                   </button>
-                  {callError ? (
+                  {callError != null || callErrorI18n != null ? (
                     <div className="mt-3 select-none rounded-xl border border-red-300/80 bg-red-50 p-4 text-xs leading-relaxed text-red-900 dark:border-red-500/25 dark:bg-red-950/40 dark:text-red-100/95">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-red-800 dark:text-red-200/90">
@@ -899,11 +998,13 @@ export function ToolsPanel() {
                           )
                           : null}
                       </div>
-                      <pre className="overflow-x-auto whitespace-pre-wrap">{callError}</pre>
+                      <pre className="overflow-x-auto whitespace-pre-wrap">
+                        {resolveMcpErrorDisplay(callError, callErrorI18n, t)}
+                      </pre>
                       {callDiagnostics ? <McpConnectDiagnosticsBlock d={callDiagnostics} /> : null}
                     </div>
                   ) : null}
-                  {callResult !== null && !callError ? (
+                  {callResult !== null && callError == null && callErrorI18n == null ? (
                     <div className="mt-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
@@ -998,6 +1099,11 @@ export function ToolsPanel() {
         open={httpDetailOpen}
         trace={callHttpTrace}
         onClose={() => setHttpDetailOpen(false)}
+      />
+      <ToolCallHttpDetailModal
+        open={connectHttpDetailOpen}
+        trace={connectHttpTrace}
+        onClose={() => setConnectHttpDetailOpen(false)}
       />
     </main>
   )

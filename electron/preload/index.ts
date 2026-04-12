@@ -6,6 +6,7 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  McpHttpTransport,
   SetMcpServersResult,
 } from '../../shared/types'
 import type { AppLanguage } from '../../shared/locale'
@@ -54,8 +55,19 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
   setServers(list: MCPServer[]): Promise<SetMcpServersResult> {
     return ipcRenderer.invoke('mcp:set-servers', list)
   },
-  fetchToolsList(url: string, headers?: MCPHttpHeader[], reuseSession?: boolean): Promise<FetchToolsResult> {
-    return ipcRenderer.invoke('mcp:fetch-tools', url, headers ?? [], reuseSession === true)
+  fetchToolsList(
+    url: string,
+    headers?: MCPHttpHeader[],
+    reuseSession?: boolean,
+    transport?: McpHttpTransport,
+  ): Promise<FetchToolsResult> {
+    return ipcRenderer.invoke(
+      'mcp:fetch-tools',
+      url,
+      headers ?? [],
+      reuseSession === true,
+      transport ?? 'streamable-http',
+    )
   },
   callTool(
     url: string,
@@ -63,8 +75,17 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
     reuseSession?: boolean,
+    transport?: McpHttpTransport,
   ): Promise<CallToolResult> {
-    return ipcRenderer.invoke('mcp:call-tool', url, toolName, args, headers ?? [], reuseSession === true)
+    return ipcRenderer.invoke(
+      'mcp:call-tool',
+      url,
+      toolName,
+      args,
+      headers ?? [],
+      reuseSession === true,
+      transport ?? 'streamable-http',
+    )
   },
   exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult> {
     return ipcRenderer.invoke('mcp:export-servers-json', opts ?? {})
