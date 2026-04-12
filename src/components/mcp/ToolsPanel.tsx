@@ -187,6 +187,8 @@ export function ToolsPanel() {
     lastHeaders,
     mcpHttpTransport,
     setMcpHttpTransport,
+    sseLinkState,
+    setSseLinkState,
     selectedToolName,
     fetchForUrl,
     setSelectedTool,
@@ -358,8 +360,10 @@ export function ToolsPanel() {
         setCallErrorI18n(out.errorI18n ?? null)
         setCallDiagnostics(out.diagnostics ?? null)
         setCallHttpTrace(out.httpTrace ?? null)
+        if (mcpHttpTransport === 'sse') setSseLinkState('error')
         return
       }
+      if (mcpHttpTransport === 'sse') setSseLinkState('ready')
       setCallResult(out.result)
       setJsonPreviewEpoch((n) => n + 1)
       setCallHttpTrace(out.httpTrace ?? null)
@@ -368,6 +372,7 @@ export function ToolsPanel() {
       setCallErrorI18n(null)
       setCallDiagnostics(null)
       setCallHttpTrace(null)
+      if (mcpHttpTransport === 'sse') setSseLinkState('error')
     } finally {
       setCallLoading(false)
     }
@@ -376,6 +381,7 @@ export function ToolsPanel() {
     selected?.headers,
     reuseMcpSessionEffective,
     mcpHttpTransport,
+    setSseLinkState,
     selectedTool,
     toolArgsJson,
     argsMode,
@@ -657,6 +663,48 @@ export function ToolsPanel() {
                       aria-hidden
                     />
                   </button>
+                </span>
+              ) : selected && mcpHttpTransport === 'sse' ? (
+                <span
+                  className="flex max-w-[min(100%,7.5rem)] shrink-0 items-center gap-1.5"
+                  title={t('tools.sseLinkTitle')}
+                >
+                  <span className="hidden text-[9px] font-medium uppercase leading-tight tracking-wide text-zinc-500 dark:text-zinc-600 sm:inline">
+                    {t('tools.sseLinkShort')}
+                  </span>
+                  <span
+                    className={`inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold tabular-nums ${
+                      sseLinkState === 'ready'
+                        ? 'bg-emerald-500/15 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200/95'
+                        : sseLinkState === 'connecting'
+                          ? 'bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100/90'
+                          : sseLinkState === 'error'
+                            ? 'bg-red-500/15 text-red-900 dark:bg-red-500/20 dark:text-red-100/90'
+                            : 'bg-zinc-200/90 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400'
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        sseLinkState === 'ready'
+                          ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]'
+                          : sseLinkState === 'connecting'
+                            ? 'animate-pulse bg-amber-500'
+                            : sseLinkState === 'error'
+                              ? 'bg-red-500'
+                              : 'bg-zinc-400 dark:bg-zinc-500'
+                      }`}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 truncate">
+                      {sseLinkState === 'connecting'
+                        ? t('tools.sseLinkConnecting')
+                        : sseLinkState === 'ready'
+                          ? t('tools.sseLinkReady')
+                          : sseLinkState === 'error'
+                            ? t('tools.sseLinkError')
+                            : t('tools.sseLinkOff')}
+                    </span>
+                  </span>
                 </span>
               ) : null}
             </div>

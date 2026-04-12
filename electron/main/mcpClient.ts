@@ -24,6 +24,15 @@ import type {
   McpToolCallHttpTrace,
 } from '../../shared/types'
 import { LegacySseBridge } from './mcpLegacySseBridge'
+import {
+  disposeAllHeldSseExcept,
+  disposeHeldSse,
+  getHeldSse,
+  makeSseHeldKey,
+  putHeldSse,
+  touchHeldSse,
+  type SseHeldEntry,
+} from './mcpSseHeldSession'
 
 const CLIENT_NAME = 'mcp-browser'
 
@@ -608,6 +617,309 @@ async function acquireSession(
   return { ok: true, href: r.href, sessionId: r.sessionId, cacheKey }
 }
 
+async function attemptSseToolsListWithHeld(
+  held: SseHeldEntry,
+  sseKey: string,
+  userHeaders: Record<string, string>,
+  opSignal: AbortSignal,
+): Promise<FetchToolsResult | 'retry'> {
+  const hadSidForList = !!(held.sessionId && held.sessionId.length > 0)
+  const listId = held.nextRpcId++
+  const listPayload = {
+    jsonrpc: '2.0' as const,
+    id: listId,
+    method: 'tools/list' as const,
+    params: {},
+  }
+  const listReqTrace = makePostRequestTrace(held.postHref, userHeaders, held.sessionId, listPayload)
+  try {
+    const listRead = await postMcpRpcReadResult(
+      held.bridge,
+      held.postHref,
+      listPayload,
+      listId,
+      held.sessionId,
+      opSignal,
+      userHeaders,
+    )
+    if (listRead.error) {
+      disposeHeldSse(sseKey)
+      return {
+        ok: false,
+        error: `tools/list 失败：${listRead.error.message}`,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+    if (listRead.httpError && listRead.result === undefined) {
+      disposeHeldSse(sseKey)
+      return {
+        ok: false,
+        error: listRead.httpError,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+    const sid = listRead.sessionHeader
+    if (sid) held.sessionId = sid
+    touchHeldSse(sseKey)
+    return {
+      ok: true,
+      tools: normalizeTools(listRead.result),
+      sseHeld: true,
+    }
+  } catch {
+    disposeHeldSse(sseKey)
+    return 'retry'
+  }
+}
+
+async function fetchMcpToolsListSse(
+  sseBaseUrl: string,
+  userHeaders: Record<string, string>,
+): Promise<FetchToolsResult> {
+  const sseKey = makeSseHeldKey(sseBaseUrl, userHeaders)
+  disposeAllHeldSseExcept(sseKey)
+
+  const opSignal = AbortSignal.timeout(60_000)
+
+  const heldExisting = getHeldSse(sseKey)
+  if (heldExisting) {
+    const r = await attemptSseToolsListWithHeld(heldExisting, sseKey, userHeaders, opSignal)
+    if (r !== 'retry') return r
+  }
+
+  let legacySse: LegacySseBridge | null = null
+  try {
+    const prepared = await prepareMcpPostTransport(sseBaseUrl, 'sse', userHeaders, opSignal)
+    if (!prepared.ok) {
+      return {
+        ok: false,
+        error: prepared.error,
+        diagnostics: connDiag('headers', null, false, prepared.error),
+      }
+    }
+
+    legacySse = prepared.legacySse!
+    const postHref = prepared.href
+
+    const session = await acquireSession(postHref, userHeaders, false, legacySse)
+    if (!session.ok) {
+      legacySse.dispose()
+      legacySse = null
+      return {
+        ok: false,
+        error: session.error,
+        diagnostics: session.diagnostics,
+        httpTrace: session.httpTrace,
+      }
+    }
+
+    const { href, sessionId } = session
+    const hadSidForList = !!(sessionId && sessionId.length > 0)
+
+    const listPayload = {
+      jsonrpc: '2.0' as const,
+      id: 2,
+      method: 'tools/list' as const,
+      params: {},
+    }
+    const listReqTrace = makePostRequestTrace(href, userHeaders, sessionId, listPayload)
+
+    let listRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
+    try {
+      listRead = await postMcpRpcReadResult(
+        legacySse,
+        href,
+        listPayload,
+        2,
+        sessionId,
+        opSignal,
+        userHeaders,
+      )
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      closeMcpSession(href, sessionId, userHeaders)
+      return {
+        ok: false,
+        error: message,
+        diagnostics: connDiag('tools/list', null, hadSidForList, message),
+        httpTrace: { request: listReqTrace, response: null },
+      }
+    }
+
+    if (listRead.error) {
+      closeMcpSession(href, sessionId, userHeaders)
+      return {
+        ok: false,
+        error: `tools/list 失败：${listRead.error.message}`,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+    if (listRead.httpError && listRead.result === undefined) {
+      closeMcpSession(href, sessionId, userHeaders)
+      return {
+        ok: false,
+        error: listRead.httpError,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+
+    const tools = normalizeTools(listRead.result)
+    const sid = listRead.sessionHeader ?? sessionId
+
+    putHeldSse(sseKey, {
+      bridge: legacySse,
+      postHref: href,
+      sessionId: sid,
+      userHeaders: { ...userHeaders },
+      lastUsedAt: Date.now(),
+      nextRpcId: 3,
+    })
+    legacySse = null
+
+    return { ok: true, tools, sseHeld: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      error: message,
+      diagnostics: connDiag('tools/list', null, false, message),
+    }
+  } finally {
+    if (legacySse) legacySse.dispose()
+  }
+}
+
+async function callMcpToolSseHeld(
+  sseBaseUrl: string,
+  name: string,
+  args: Record<string, unknown>,
+  userHeaders: Record<string, string>,
+): Promise<CallToolResult> {
+  const sseKey = makeSseHeldKey(sseBaseUrl, userHeaders)
+  const held = getHeldSse(sseKey)
+  if (!held) {
+    const detail =
+      'No held HTTP/SSE session; refresh tools list for this endpoint first.'
+    return {
+      ok: false,
+      error: detail,
+      errorI18n: { key: 'tools.sseNotHeld' },
+      diagnostics: connDiag('tools/call', null, false, detail),
+    }
+  }
+
+  const opSignal = AbortSignal.timeout(60_000)
+  const rpcId = held.nextRpcId++
+  const bodyObj = {
+    jsonrpc: '2.0' as const,
+    id: rpcId,
+    method: 'tools/call' as const,
+    params: { name, arguments: args },
+  }
+  const mergedHeaders = mergePostHeaders(userHeaders, held.sessionId)
+  const bodyStr = JSON.stringify(bodyObj)
+  const reqTrace: McpToolCallHttpTrace['request'] = {
+    method: 'POST',
+    url: held.postHref,
+    headersText: sortHeaderLinesFromRecord(mergedHeaders),
+    body: bodyStr,
+  }
+
+  let callRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
+  try {
+    callRead = await postMcpRpcReadResult(
+      held.bridge,
+      held.postHref,
+      bodyObj,
+      rpcId,
+      held.sessionId,
+      opSignal,
+      userHeaders,
+    )
+  } catch (e) {
+    disposeHeldSse(sseKey)
+    const message = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      error: message,
+      diagnostics: connDiag('tools/call', null, !!(held.sessionId && held.sessionId.length > 0), message),
+      httpTrace: { request: reqTrace, response: null },
+    }
+  }
+
+  const httpTrace: McpToolCallHttpTrace = {
+    request: reqTrace,
+    response: {
+      status: callRead.status,
+      statusText: '',
+      headersText: '',
+      body: callRead.raw,
+    },
+  }
+
+  if (callRead.error) {
+    disposeHeldSse(sseKey)
+    const hadSidForCall = !!(held.sessionId && held.sessionId.length > 0)
+    return {
+      ok: false,
+      error: `tools/call 失败：${callRead.error.message}`,
+      diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.error.message),
+      httpTrace,
+    }
+  }
+  if (callRead.httpError && callRead.result === undefined) {
+    disposeHeldSse(sseKey)
+    const hadSidForCall = !!(held.sessionId && held.sessionId.length > 0)
+    return {
+      ok: false,
+      error: callRead.httpError,
+      diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.httpError),
+      httpTrace,
+    }
+  }
+
+  const sid = callRead.sessionHeader
+  if (sid) held.sessionId = sid
+  touchHeldSse(sseKey)
+  return { ok: true, result: callRead.result, httpTrace }
+}
+
 export async function fetchMcpToolsList(
   endpoint: string,
   extraHeaders?: MCPHttpHeader[],
@@ -628,6 +940,13 @@ export async function fetchMcpToolsList(
   }
 
   const userHeaders = mcpHeadersToRecord(extraHeaders)
+
+  if (transport === 'sse') {
+    return fetchMcpToolsListSse(parsed.href, userHeaders)
+  }
+
+  disposeAllHeldSseExcept(null)
+
   const opSignal = AbortSignal.timeout(60_000)
   const prepared = await prepareMcpPostTransport(parsed.href, transport, userHeaders, opSignal)
   if (!prepared.ok) {
@@ -768,6 +1087,13 @@ export async function callMcpTool(
   }
 
   const userHeaders = mcpHeadersToRecord(extraHeaders)
+
+  if (transport === 'sse') {
+    return callMcpToolSseHeld(parsed.href, name, args, userHeaders)
+  }
+
+  disposeAllHeldSseExcept(null)
+
   const opSignal = AbortSignal.timeout(60_000)
   const prepared = await prepareMcpPostTransport(parsed.href, transport, userHeaders, opSignal)
   if (!prepared.ok) {

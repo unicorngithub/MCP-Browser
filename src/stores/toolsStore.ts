@@ -10,6 +10,9 @@ import type {
 
 type ConnState = 'idle' | 'loading' | 'ok' | 'error'
 
+/** HTTP/SSE 时侧栏展示的链路状态（与 Streamable 的「复用会话」开关位置对应） */
+export type SseLinkUiState = 'off' | 'connecting' | 'ready' | 'error'
+
 interface ToolsState {
   tools: MCPTool[]
   connection: ConnState
@@ -24,8 +27,11 @@ interface ToolsState {
   lastReuseMcpSession: boolean
   /** 主界面选择的 MCP HTTP 传输（不写入端点配置） */
   mcpHttpTransport: McpHttpTransport
+  /** 仅 HTTP/SSE 传输时有效：当前是否保持与列表拉取同一条 SSE */
+  sseLinkState: SseLinkUiState
   selectedToolName: string | null
   setMcpHttpTransport: (transport: McpHttpTransport) => void
+  setSseLinkState: (state: SseLinkUiState) => void
   fetchForUrl: (
     url: string | null,
     headers?: MCPHttpHeader[],
@@ -46,9 +52,12 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
   lastHeaders: undefined,
   lastReuseMcpSession: false,
   mcpHttpTransport: 'streamable-http',
+  sseLinkState: 'off',
   selectedToolName: null,
 
   setMcpHttpTransport: (transport) => set({ mcpHttpTransport: transport }),
+
+  setSseLinkState: (state) => set({ sseLinkState: state }),
 
   fetchForUrl: async (url, headers, reuseMcpSession = false) => {
     const httpTransport = get().mcpHttpTransport
@@ -65,6 +74,7 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
         lastHeaders: undefined,
         lastReuseMcpSession: false,
         selectedToolName: null,
+        sseLinkState: 'off',
       })
       return
     }
@@ -79,6 +89,7 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
       lastHeaders: headers,
       lastReuseMcpSession: reuseMcpSession,
       selectedToolName: null,
+      sseLinkState: httpTransport === 'sse' ? 'connecting' : 'off',
     })
 
     try {
@@ -93,6 +104,7 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
           connectDiagnostics: result.diagnostics ?? null,
           connectHttpTrace: result.httpTrace ?? null,
           tools: [],
+          sseLinkState: httpTransport === 'sse' ? 'error' : 'off',
         })
         return
       }
@@ -103,6 +115,8 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
         errorI18n: null,
         connectDiagnostics: null,
         connectHttpTrace: null,
+        sseLinkState:
+          httpTransport === 'sse' ? (result.sseHeld ? 'ready' : 'off') : 'off',
       })
     } catch (e) {
       if (get().lastUrl !== url) return
@@ -114,6 +128,7 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
         connectDiagnostics: null,
         connectHttpTrace: null,
         tools: [],
+        sseLinkState: httpTransport === 'sse' ? 'error' : 'off',
       })
     }
   },
@@ -132,5 +147,6 @@ export const useToolsStore = create<ToolsState>((set, get) => ({
       lastHeaders: undefined,
       lastReuseMcpSession: false,
       selectedToolName: null,
+      sseLinkState: 'off',
     }),
 }))
