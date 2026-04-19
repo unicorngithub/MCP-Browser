@@ -1,12 +1,11 @@
 import { create } from 'zustand'
 import type { MCPHttpHeader, MCPServer } from '@shared/types'
+import { useWorkspaceUiStore } from './workspaceUiStore'
 
 interface AddressState {
   servers: MCPServer[]
-  selectedId: string | null
   ready: boolean
   hydrate: () => Promise<void>
-  select: (id: string | null) => void
   addServer: (name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   updateServer: (id: string, name: string, url: string, headers?: MCPHttpHeader[]) => Promise<void>
   removeServer: (id: string) => Promise<void>
@@ -14,8 +13,6 @@ interface AddressState {
   reorderServers: (fromIndex: number, beforeIndex: number) => Promise<void>
   /** 用导入列表完全替换本地端点（会持久化） */
   replaceAllServers: (list: MCPServer[]) => Promise<void>
-  /** 更新该端点是否复用 MCP 会话（写入端点配置） */
-  setServerReuseMcpSession: (id: string, reuse: boolean) => Promise<void>
 }
 
 async function persist(list: MCPServer[]): Promise<boolean> {
@@ -34,24 +31,41 @@ function normalizePersistedHeaders(headers: MCPHttpHeader[] | undefined): MCPHtt
     .filter((x) => x.name.length > 0)
 }
 
+function patchSelectionsAfterRemove(removedId: string, nextServers: MCPServer[]): void {
+  const fallback = nextServers[0]?.id ?? null
+  useWorkspaceUiStore.setState((s) => {
+    const selMap = { ...s.selectedServerByWs }
+    for (const w of Object.keys(selMap)) {
+      if (selMap[w] === removedId) selMap[w] = fallback
+    }
+    return { selectedServerByWs: selMap }
+  })
+}
+
+function setAllSelections(serverId: string | null): void {
+  useWorkspaceUiStore.setState((s) => {
+    const selMap = { ...s.selectedServerByWs }
+    for (const w of Object.keys(selMap)) {
+      selMap[w] = serverId
+    }
+    return { selectedServerByWs: selMap }
+  })
+}
+
 export const useAddressStore = create<AddressState>((set, get) => ({
   servers: [],
-  selectedId: null,
   ready: false,
 
   hydrate: async () => {
     try {
       const list = await window.mcpDesktop.getServers()
-      const prev = get().selectedId
-      const selectedId =
-        prev && list.some(s => s.id === prev) ? prev : list[0]?.id ?? null
-      set({ servers: list, ready: true, selectedId })
+      set({ servers: list, ready: true })
+      useWorkspaceUiStore.getState().pruneSelectionsAfterHydrate(list)
     } catch {
-      set({ servers: [], ready: true, selectedId: null })
+      set({ servers: [], ready: true })
+      useWorkspaceUiStore.getState().pruneSelectionsAfterHydrate([])
     }
   },
-
-  select: (id) => set({ selectedId: id }),
 
   addServer: async (name, url, headers) => {
     const trimmedUrl = url.trim()
@@ -65,7 +79,8 @@ export const useAddressStore = create<AddressState>((set, get) => ({
     }
     const next = [server, ...get().servers]
     if (!(await persist(next))) return
-    set({ servers: next, selectedId: server.id })
+    set({ servers: next })
+    useWorkspaceUiStore.getState().selectForActiveWorkspace(server.id)
   },
 
   updateServer: async (id, name, url, headers) => {
@@ -86,11 +101,11 @@ export const useAddressStore = create<AddressState>((set, get) => ({
   },
 
   removeServer: async (id) => {
-    const { servers, selectedId } = get()
+    const servers = get().servers
     const next = servers.filter(s => s.id !== id)
     if (!(await persist(next))) return
-    const newSel = selectedId === id ? next[0]?.id ?? null : selectedId
-    set({ servers: next, selectedId: newSel })
+    set({ servers: next })
+    patchSelectionsAfterRemove(id, next)
   },
 
   reorderServers: async (fromIndex, beforeIndex) => {
@@ -110,18 +125,15 @@ export const useAddressStore = create<AddressState>((set, get) => ({
   },
 
   replaceAllServers: async (list) => {
-    if (!(await persist(list))) return
-    set({ servers: list, selectedId: list[0]?.id ?? null })
-  },
-
-  setServerReuseMcpSession: async (id, reuse) => {
-    const next = get().servers.map((s) => {
-      if (s.id !== id) return s
-      const { reuseMcpSession: _r, ...rest } = s
-      if (reuse) return { ...rest, reuseMcpSession: true as const }
-      return rest
-    })
-    if (!(await persist(next))) return
-    set({ servers: next })
+    const stripped = list.map(stripReuseField)
+    if (!(await persist(stripped))) return
+    set({ servers: stripped })
+    const first = stripped[0]?.id ?? null
+    setAllSelections(first)
   },
 }))
+
+function stripReuseField(s: MCPServer): MCPServer {
+  const { reuseMcpSession: _r, ...rest } = s
+  return rest
+}

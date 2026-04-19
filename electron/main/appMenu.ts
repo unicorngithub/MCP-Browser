@@ -1,4 +1,6 @@
 import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron'
+import { getWindowModePreference, setWindowModePreference } from './windowModeStore'
+import type { WindowModePreference } from '../../shared/windowMode'
 import { openExternalUrlIfAllowed } from './openExternalPolicy'
 import type { MenuItemConstructorOptions } from 'electron'
 import {
@@ -218,7 +220,7 @@ function openNonMacAboutWindow(): void {
 <body>
   <div class="shell">
     <div class="card">
-      <p class="eyebrow">MCP BROWSER</p>
+      <p class="eyebrow">MCP Browser</p>
       <h1 class="title">${titleEscaped}</h1>
       <div class="content">${bodyHtml}</div>
       <div class="footer">
@@ -324,6 +326,18 @@ function sendOpenUsageGuideRequest(): void {
   if (w && !w.isDestroyed()) w.webContents.send('app-menu:usage-guide')
 }
 
+function broadcastWindowMode(mode: WindowModePreference): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed()) w.webContents.send('app-menu:window-mode', mode)
+  }
+}
+
+function broadcastAppLanguage(lng: AppLanguage): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed()) w.webContents.send('app-menu:language', lng)
+  }
+}
+
 /**
  * 应用菜单：文件 / 编辑 / 显示 / 设置 / 帮助；macOS 另含应用菜单与「窗口」菜单。
  * Windows / Linux 单窗口，不重复提供「窗口」菜单（最小化等用标题栏即可）。
@@ -337,9 +351,10 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
 
   const s = shellStrings()
   const isMac = process.platform === 'darwin'
+  const windowMode = getWindowModePreference()
 
   app.setAboutPanelOptions({
-    applicationName: 'MCP BROWSER',
+    applicationName: 'MCP Browser',
     applicationVersion: app.getVersion(),
     copyright: s.aboutPanelCopyright,
     website: MCP_BROWSER_REPOSITORY_URL,
@@ -437,6 +452,55 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
                 syncNativeThemeSource('system')
                 installAppMenu('system')
                 sendThemeToRenderer('system')
+              },
+            },
+          ],
+        },
+        {
+          label: s.languageLabel,
+          submenu: [
+            {
+              label: s.languageEnglish,
+              type: 'radio',
+              checked: menuLang === 'en',
+              click: () => {
+                installAppMenu(menuTheme, 'en')
+                broadcastAppLanguage('en')
+              },
+            },
+            {
+              label: s.languageZhCN,
+              type: 'radio',
+              checked: menuLang === 'zh-CN',
+              click: () => {
+                installAppMenu(menuTheme, 'zh-CN')
+                broadcastAppLanguage('zh-CN')
+              },
+            },
+          ],
+        },
+        { type: 'separator' },
+        {
+          label: s.windowModeLabel,
+          submenu: [
+            {
+              label: s.windowModeSingle,
+              type: 'radio',
+              checked: windowMode === 'single',
+              click: () => {
+                setWindowModePreference('single')
+                broadcastWindowMode('single')
+                installAppMenu(menuTheme, menuLang)
+              },
+            },
+            {
+              label: s.windowModeMulti,
+              type: 'radio',
+              checked: windowMode === 'multi',
+              click: () => {
+                setWindowModePreference('multi')
+                broadcastWindowMode('multi')
+                installAppMenu(menuTheme, menuLang)
               },
             },
           ],

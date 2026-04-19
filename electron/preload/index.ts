@@ -6,10 +6,12 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  McpHttpTransport,
   SetMcpServersResult,
 } from '../../shared/types'
 import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
+import type { WindowModePreference } from '../../shared/windowMode'
 
 /** 与 `electron/main/update.ts` 中 `ipcMain.handle` 名称一致 */
 const UPDATER_INVOKE_CHANNELS = new Set<string>([
@@ -54,8 +56,19 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
   setServers(list: MCPServer[]): Promise<SetMcpServersResult> {
     return ipcRenderer.invoke('mcp:set-servers', list)
   },
-  fetchToolsList(url: string, headers?: MCPHttpHeader[], reuseSession?: boolean): Promise<FetchToolsResult> {
-    return ipcRenderer.invoke('mcp:fetch-tools', url, headers ?? [], reuseSession === true)
+  fetchToolsList(
+    url: string,
+    headers?: MCPHttpHeader[],
+    reuseSession?: boolean,
+    transport?: McpHttpTransport,
+  ): Promise<FetchToolsResult> {
+    return ipcRenderer.invoke(
+      'mcp:fetch-tools',
+      url,
+      headers ?? [],
+      reuseSession === true,
+      transport ?? 'streamable-http',
+    )
   },
   callTool(
     url: string,
@@ -63,8 +76,17 @@ contextBridge.exposeInMainWorld('mcpDesktop', {
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
     reuseSession?: boolean,
+    transport?: McpHttpTransport,
   ): Promise<CallToolResult> {
-    return ipcRenderer.invoke('mcp:call-tool', url, toolName, args, headers ?? [], reuseSession === true)
+    return ipcRenderer.invoke(
+      'mcp:call-tool',
+      url,
+      toolName,
+      args,
+      headers ?? [],
+      reuseSession === true,
+      transport ?? 'streamable-http',
+    )
   },
   exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult> {
     return ipcRenderer.invoke('mcp:export-servers-json', opts ?? {})
@@ -97,6 +119,29 @@ contextBridge.exposeInMainWorld('appTheme', {
 contextBridge.exposeInMainWorld('appLocale', {
   notifyLanguageChanged(lng: AppLanguage) {
     if (lng === 'en' || lng === 'zh-CN') ipcRenderer.send('app:language-changed', lng)
+  },
+  onMenuLanguageSelect(handler: (lng: AppLanguage) => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, lng: unknown) => {
+      if (lng === 'en' || lng === 'zh-CN') handler(lng)
+    }
+    ipcRenderer.on('app-menu:language', wrap)
+    return () => ipcRenderer.removeListener('app-menu:language', wrap)
+  },
+})
+
+contextBridge.exposeInMainWorld('appWorkspace', {
+  getWindowMode(): Promise<WindowModePreference> {
+    return ipcRenderer.invoke('app:get-window-mode')
+  },
+  setWindowMode(mode: WindowModePreference): Promise<{ ok: boolean }> {
+    return ipcRenderer.invoke('app:set-window-mode', mode)
+  },
+  onWindowMode(handler: (mode: WindowModePreference) => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, mode: unknown) => {
+      if (mode === 'single' || mode === 'multi') handler(mode)
+    }
+    ipcRenderer.on('app-menu:window-mode', wrap)
+    return () => ipcRenderer.removeListener('app-menu:window-mode', wrap)
   },
 })
 

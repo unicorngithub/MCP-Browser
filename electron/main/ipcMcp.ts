@@ -13,6 +13,7 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  McpHttpTransport,
   SetMcpServersResult,
 } from '../../shared/types'
 import { getMenuLanguage } from './appMenu'
@@ -31,6 +32,11 @@ function parseHeadersIpc(raw: unknown): MCPHttpHeader[] | undefined {
     out.push({ name: n, value: v })
   }
   return out.length ? out : undefined
+}
+
+function parseHttpTransport(raw: unknown): McpHttpTransport | undefined {
+  if (raw === 'sse' || raw === 'streamable-http') return raw
+  return undefined
 }
 
 export function registerMcpIpc(): void {
@@ -58,23 +64,35 @@ export function registerMcpIpc(): void {
     }
   })
 
-  ipcMain.handle('mcp:fetch-tools', async (_evt, url: unknown, headers: unknown, reuseSession: unknown) => {
-    try {
-      if (typeof url !== 'string') {
-        return { ok: false, error: '参数无效' } as const
+  ipcMain.handle(
+    'mcp:fetch-tools',
+    async (_evt, url: unknown, headers: unknown, reuseSession: unknown, transportRaw: unknown) => {
+      try {
+        if (typeof url !== 'string') {
+          return { ok: false, error: '参数无效' } as const
+        }
+        const h = parseHeadersIpc(headers)
+        const reuse = reuseSession === true
+        const transport = parseHttpTransport(transportRaw) ?? 'streamable-http'
+        return await fetchMcpToolsList(url, h, reuse, transport)
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        return { ok: false, error: message } as const
       }
-      const h = parseHeadersIpc(headers)
-      const reuse = reuseSession === true
-      return await fetchMcpToolsList(url, h, reuse)
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e)
-      return { ok: false, error: message } as const
-    }
-  })
+    },
+  )
 
   ipcMain.handle(
     'mcp:call-tool',
-    async (_evt, url: unknown, toolName: unknown, args: unknown, headers: unknown, reuseSession: unknown) => {
+    async (
+      _evt,
+      url: unknown,
+      toolName: unknown,
+      args: unknown,
+      headers: unknown,
+      reuseSession: unknown,
+      transportRaw: unknown,
+    ) => {
       try {
         if (typeof url !== 'string' || typeof toolName !== 'string') {
           return { ok: false, error: '参数无效' } as const
@@ -84,7 +102,8 @@ export function registerMcpIpc(): void {
         }
         const h = parseHeadersIpc(headers)
         const reuse = reuseSession === true
-        return await callMcpTool(url, toolName, args as Record<string, unknown>, h, reuse)
+        const transport = parseHttpTransport(transportRaw) ?? 'streamable-http'
+        return await callMcpTool(url, toolName, args as Record<string, unknown>, h, reuse, transport)
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
         return { ok: false, error: message } as const

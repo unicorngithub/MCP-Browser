@@ -7,6 +7,11 @@ import {
   runExclusiveSessionOpen,
   touchCachedSession,
 } from './mcpSessionCache'
+import {
+  type McpHeaderValidationFailure,
+  mcpHeaderValidationFailureName,
+  mcpHeaderValidationFailureValue,
+} from '../../shared/mcpHeaderValidationMessages'
 import type {
   CallToolResult,
   FetchToolsResult,
@@ -14,8 +19,20 @@ import type {
   MCPTool,
   McpConnectDiagnostics,
   McpConnectStep,
+  McpErrorI18n,
+  McpHttpTransport,
   McpToolCallHttpTrace,
 } from '../../shared/types'
+import { LegacySseBridge } from './mcpLegacySseBridge'
+import {
+  disposeAllHeldSseExcept,
+  disposeHeldSse,
+  getHeldSse,
+  makeSseHeldKey,
+  putHeldSse,
+  touchHeldSse,
+  type SseHeldEntry,
+} from './mcpSseHeldSession'
 
 const CLIENT_NAME = 'mcp-browser'
 
@@ -93,6 +110,36 @@ function getSessionId(res: Response): string | null {
   return res.headers.get('mcp-session-id') || res.headers.get('Mcp-Session-Id')
 }
 
+/**
+ * Chromium fetch 要求 Headers 的 name/value 为 ByteString（每码元 ≤255）。
+ * 含中文等会同步抛错，且不会出现 HTTP 响应。
+ */
+function isHeaderByteStringCompatible(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 255) return false
+  }
+  return true
+}
+
+export function validateMcpExtraHeadersForFetch(
+  rows: MCPHttpHeader[] | undefined,
+): McpHeaderValidationFailure | null {
+  if (!rows?.length) return null
+  for (let idx = 0; idx < rows.length; idx++) {
+    const { name, value } = rows[idx]
+    const n = typeof name === 'string' ? name.trim() : ''
+    if (!n) continue
+    const v = typeof value === 'string' ? value : String(value)
+    if (!isHeaderByteStringCompatible(n)) {
+      return mcpHeaderValidationFailureName(idx + 1)
+    }
+    if (!isHeaderByteStringCompatible(v)) {
+      return mcpHeaderValidationFailureValue(n)
+    }
+  }
+  return null
+}
+
 /** 将配置的 header 列表转为 fetch 用的字典（忽略空名称） */
 export function mcpHeadersToRecord(rows: MCPHttpHeader[] | undefined): Record<string, string> {
   const out: Record<string, string> = {}
@@ -138,23 +185,74 @@ async function mcpPost(
   })
 }
 
-async function sendInitializedNotification(
+/** Streamable HTTP：响应在 POST body；HTTP/SSE 可能在 POST 空/202 后由 SSE `message` 事件送达 */
+async function postMcpRpcReadResult(
+  legacySse: LegacySseBridge | null,
   href: string,
+  body: unknown,
+  rpcId: number,
   sessionId: string | null,
   signal: AbortSignal,
   userHeaders: Record<string, string>,
-): Promise<{ ok: true } | { ok: false; status: number; detail: string }> {
-  const res = await mcpPost(
-    href,
-    { jsonrpc: '2.0', method: 'notifications/initialized' },
-    sessionId,
-    signal,
-    userHeaders,
-  )
-  if (res.status === 202) return { ok: true }
-  if (res.ok && (res.status === 200 || res.status === 204)) return { ok: true }
-  const t = await res.text()
-  return { ok: false, status: res.status, detail: t.slice(0, 300) }
+): Promise<{
+  raw: string
+  status: number
+  sessionHeader: string | null
+  result?: unknown
+  error?: { message: string; code?: number }
+  httpError?: string
+}> {
+  const sseWait = legacySse ? legacySse.waitForJsonRpcMessage(rpcId, signal) : null
+
+  let initRes: Response
+  try {
+    initRes = await mcpPost(href, body, sessionId, signal, userHeaders)
+  } catch (e) {
+    if (legacySse) legacySse.cancelRpcWait(rpcId)
+    throw e
+  }
+
+  const sessionHeader = getSessionId(initRes)
+  const raw = await initRes.text()
+  const ct = initRes.headers.get('content-type') ?? ''
+  const parsed = parseRpcFromRaw(initRes.status, ct, raw, rpcId, initRes.ok)
+  const { status: _parsedStatus, ...parsedRest } = parsed
+
+  if (parsed.result !== undefined || parsed.error) {
+    if (legacySse) legacySse.cancelRpcWait(rpcId)
+    return { raw, status: initRes.status, sessionHeader, ...parsedRest }
+  }
+
+  if (!initRes.ok) {
+    if (legacySse) legacySse.cancelRpcWait(rpcId)
+    return { raw, status: initRes.status, sessionHeader, ...parsedRest }
+  }
+
+  if (!legacySse || !sseWait) {
+    return { raw, status: initRes.status, sessionHeader, ...parsedRest }
+  }
+
+  try {
+    const msg = await sseWait
+    const msgStr =
+      typeof msg === 'object' && msg !== null ? JSON.stringify(msg as object) : String(msg)
+    const fromSse = parseRpcFromRaw(200, 'application/json', msgStr, rpcId, true)
+    const { status: _s, ...fromSseRest } = fromSse
+    return {
+      raw: raw.trim() ? `${raw}\n---sse---\n${msgStr}` : msgStr,
+      status: initRes.status,
+      sessionHeader,
+      ...fromSseRest,
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return {
+      raw,
+      status: initRes.status,
+      sessionHeader,
+      httpError: `等待 SSE 上的 JSON-RPC 响应失败（id=${rpcId}）：${message}`,
+    }
+  }
 }
 
 function sortHeaderLinesFromRecord(h: Record<string, string>): string {
@@ -169,6 +267,60 @@ function sortHeaderLinesFromFetchHeaders(headers: Headers): string {
     .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'accent' }))
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n')
+}
+
+function makePostRequestTrace(
+  href: string,
+  userHeaders: Record<string, string>,
+  sessionId: string | null,
+  body: unknown,
+): McpToolCallHttpTrace['request'] {
+  const merged = mergePostHeaders(userHeaders, sessionId)
+  return {
+    method: 'POST',
+    url: href,
+    headersText: sortHeaderLinesFromRecord(merged),
+    body: JSON.stringify(body),
+  }
+}
+
+function makeResponseTrace(res: Response, rawBody: string): McpToolCallHttpTrace['response'] {
+  return {
+    status: res.status,
+    statusText: res.statusText,
+    headersText: sortHeaderLinesFromFetchHeaders(res.headers),
+    body: rawBody,
+  }
+}
+
+const INITIALIZED_NOTIFICATION_BODY = {
+  jsonrpc: '2.0' as const,
+  method: 'notifications/initialized' as const,
+}
+
+async function sendInitializedNotification(
+  href: string,
+  sessionId: string | null,
+  signal: AbortSignal,
+  userHeaders: Record<string, string>,
+): Promise<
+  | { ok: true }
+  | { ok: false; status: number; detail: string; httpTrace: McpToolCallHttpTrace }
+> {
+  const reqTrace = makePostRequestTrace(href, userHeaders, sessionId, INITIALIZED_NOTIFICATION_BODY)
+  const res = await mcpPost(href, INITIALIZED_NOTIFICATION_BODY, sessionId, signal, userHeaders)
+  if (res.status === 202) return { ok: true }
+  if (res.ok && (res.status === 200 || res.status === 204)) return { ok: true }
+  const t = await res.text()
+  return {
+    ok: false,
+    status: res.status,
+    detail: t.slice(0, 300),
+    httpTrace: {
+      request: reqTrace,
+      response: makeResponseTrace(res, t),
+    },
+  }
 }
 
 function parseRpcFromRaw(
@@ -203,15 +355,17 @@ async function readRpcResult(
   res: Response,
   rpcId: number,
 ): Promise<{
+  /** 原始响应体，供失败时 HTTP 追踪展示 */
+  raw: string
   status: number
   result?: unknown
   error?: { message: string; code?: number }
   httpError?: string
 }> {
-  const status = res.status
   const raw = await res.text()
   const ct = res.headers.get('content-type') ?? ''
-  return parseRpcFromRaw(status, ct, raw, rpcId, res.ok)
+  const parsed = parseRpcFromRaw(res.status, ct, raw, rpcId, res.ok)
+  return { raw, ...parsed }
 }
 
 function connDiag(
@@ -219,8 +373,11 @@ function connDiag(
   httpStatus: number | null,
   hadSessionId: boolean,
   detail: string,
+  detailI18n?: McpErrorI18n,
 ): McpConnectDiagnostics {
-  return { step, httpStatus, hadSessionId, detail }
+  return detailI18n
+    ? { step, httpStatus, hadSessionId, detail, detailI18n }
+    : { step, httpStatus, hadSessionId, detail }
 }
 
 function shouldRetryInitializeWithOlderProtocol(errMsg: string, code?: number): boolean {
@@ -248,6 +405,30 @@ function parseMcpEndpoint(endpoint: string): { ok: true; href: string } | { ok: 
   return { ok: true, href: url.href }
 }
 
+async function prepareMcpPostTransport(
+  normalizedHref: string,
+  transport: McpHttpTransport,
+  userHeaders: Record<string, string>,
+  signal: AbortSignal,
+): Promise<
+  { ok: true; href: string; legacySse: LegacySseBridge | null } | { ok: false; error: string }
+> {
+  if (transport === 'streamable-http') {
+    return { ok: true, href: normalizedHref, legacySse: null }
+  }
+  const conn = await LegacySseBridge.connect(normalizedHref, userHeaders, signal)
+  if (!conn.ok) return conn
+  const bridge = conn.bridge
+  try {
+    const href = await bridge.postUrl
+    return { ok: true, href, legacySse: bridge }
+  } catch (e) {
+    bridge.dispose()
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
+  }
+}
+
 function closeMcpSession(
   href: string,
   sessionToClose: string | null,
@@ -268,11 +449,17 @@ type OpenSessionOk = {
   sessionToClose: string | null
 }
 
-type OpenSessionFail = { ok: false; error: string; diagnostics: McpConnectDiagnostics }
+type OpenSessionFail = {
+  ok: false
+  error: string
+  diagnostics: McpConnectDiagnostics
+  httpTrace?: McpToolCallHttpTrace
+}
 
 async function openMcpSession(
   href: string,
   userHeaders: Record<string, string>,
+  legacySse: LegacySseBridge | null,
 ): Promise<({ ok: true } & OpenSessionOk) | OpenSessionFail> {
   const signal = AbortSignal.timeout(60_000)
   let sessionId: string | null = null
@@ -283,20 +470,24 @@ async function openMcpSession(
 
   for (let i = 0; i < protocolCandidates.length; i++) {
     const protocolVersion = protocolCandidates[i]
-    let initRes: Response
+    const initPayload = {
+      jsonrpc: '2.0' as const,
+      id: 1,
+      method: 'initialize' as const,
+      params: {
+        protocolVersion,
+        capabilities: {},
+        clientInfo: { name: CLIENT_NAME, version: app.getVersion() },
+      },
+    }
+    const initReqTrace = makePostRequestTrace(href, userHeaders, null, initPayload)
+    let initRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
     try {
-      initRes = await mcpPost(
+      initRead = await postMcpRpcReadResult(
+        legacySse,
         href,
-        {
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion,
-            capabilities: {},
-            clientInfo: { name: CLIENT_NAME, version: app.getVersion() },
-          },
-        },
+        initPayload,
+        1,
         null,
         signal,
         userHeaders,
@@ -307,11 +498,11 @@ async function openMcpSession(
         ok: false,
         error: message,
         diagnostics: connDiag('initialize', null, false, message),
+        httpTrace: { request: initReqTrace, response: null },
       }
     }
 
-    const sid = getSessionId(initRes)
-    const initRead = await readRpcResult(initRes, 1)
+    const sid = initRead.sessionHeader
 
     if (initRead.error) {
       const retry =
@@ -322,14 +513,32 @@ async function openMcpSession(
         ok: false,
         error: `initialize 失败：${initRead.error.message}`,
         diagnostics: connDiag('initialize', initRead.status, !!sid, initRead.error.message),
+        httpTrace: {
+          request: initReqTrace,
+          response: {
+            status: initRead.status,
+            statusText: '',
+            headersText: '',
+            body: initRead.raw,
+          },
+        },
       }
     }
 
-    if (initRead.httpError && !initRead.result) {
+    if (initRead.httpError && initRead.result === undefined) {
       return {
         ok: false,
         error: initRead.httpError,
         diagnostics: connDiag('initialize', initRead.status, !!sid, initRead.httpError),
+        httpTrace: {
+          request: initReqTrace,
+          response: {
+            status: initRead.status,
+            statusText: '',
+            headersText: '',
+            body: initRead.raw,
+          },
+        },
       }
     }
 
@@ -359,6 +568,7 @@ async function openMcpSession(
       ok: false,
       error: `notifications/initialized 失败 HTTP ${notif.status}：${notif.detail}`,
       diagnostics: connDiag('notifications/initialized', notif.status, hadSid, notif.detail),
+      httpTrace: notif.httpTrace,
     }
   }
 
@@ -367,18 +577,20 @@ async function openMcpSession(
 
 type AcquiredSession =
   | { ok: true; href: string; sessionId: string | null; cacheKey: string }
-  | { ok: false; error: string; diagnostics: McpConnectDiagnostics }
+  | { ok: false; error: string; diagnostics: McpConnectDiagnostics; httpTrace?: McpToolCallHttpTrace }
 
 async function acquireSession(
   href: string,
   userHeaders: Record<string, string>,
   reuseSession: boolean,
+  legacySse: LegacySseBridge | null,
 ): Promise<AcquiredSession> {
+  const effectiveReuse = legacySse ? false : reuseSession
   const cacheKey = makeMcpSessionCacheKey(href, userHeaders)
 
-  if (!reuseSession) {
+  if (!effectiveReuse) {
     invalidateMcpSessionCacheKey(cacheKey)
-    const r = await openMcpSession(href, userHeaders)
+    const r = await openMcpSession(href, userHeaders, legacySse)
     if (!r.ok) return r
     return { ok: true, href: r.href, sessionId: r.sessionId, cacheKey }
   }
@@ -390,7 +602,7 @@ async function acquireSession(
   }
 
   const r = await runExclusiveSessionOpen(cacheKey, async () => {
-    const opened = await openMcpSession(href, userHeaders)
+    const opened = await openMcpSession(href, userHeaders, legacySse)
     if (opened.ok) {
       putCachedSession(cacheKey, {
         href: opened.href,
@@ -405,33 +617,431 @@ async function acquireSession(
   return { ok: true, href: r.href, sessionId: r.sessionId, cacheKey }
 }
 
-export async function fetchMcpToolsList(
-  endpoint: string,
-  extraHeaders?: MCPHttpHeader[],
-  reuseSession = false,
+async function attemptSseToolsListWithHeld(
+  held: SseHeldEntry,
+  sseKey: string,
+  userHeaders: Record<string, string>,
+  opSignal: AbortSignal,
+): Promise<FetchToolsResult | 'retry'> {
+  const hadSidForList = !!(held.sessionId && held.sessionId.length > 0)
+  const listId = held.nextRpcId++
+  const listPayload = {
+    jsonrpc: '2.0' as const,
+    id: listId,
+    method: 'tools/list' as const,
+    params: {},
+  }
+  const listReqTrace = makePostRequestTrace(held.postHref, userHeaders, held.sessionId, listPayload)
+  try {
+    const listRead = await postMcpRpcReadResult(
+      held.bridge,
+      held.postHref,
+      listPayload,
+      listId,
+      held.sessionId,
+      opSignal,
+      userHeaders,
+    )
+    if (listRead.error) {
+      disposeHeldSse(sseKey)
+      return {
+        ok: false,
+        error: `tools/list 失败：${listRead.error.message}`,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+    if (listRead.httpError && listRead.result === undefined) {
+      disposeHeldSse(sseKey)
+      return {
+        ok: false,
+        error: listRead.httpError,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+    const sid = listRead.sessionHeader
+    if (sid) held.sessionId = sid
+    touchHeldSse(sseKey)
+    return {
+      ok: true,
+      tools: normalizeTools(listRead.result),
+      sseHeld: true,
+    }
+  } catch {
+    disposeHeldSse(sseKey)
+    return 'retry'
+  }
+}
+
+async function fetchMcpToolsListSse(
+  sseBaseUrl: string,
+  userHeaders: Record<string, string>,
 ): Promise<FetchToolsResult> {
-  const parsed = parseMcpEndpoint(endpoint)
-  if (!parsed.ok) return parsed
+  const sseKey = makeSseHeldKey(sseBaseUrl, userHeaders)
+  disposeAllHeldSseExcept(sseKey)
 
-  const userHeaders = mcpHeadersToRecord(extraHeaders)
-
-  const session = await acquireSession(parsed.href, userHeaders, reuseSession)
-  if (!session.ok) return { ok: false, error: session.error, diagnostics: session.diagnostics }
-
-  const { href, sessionId, cacheKey } = session
-  const hadSidForList = !!(sessionId && sessionId.length > 0)
   const opSignal = AbortSignal.timeout(60_000)
 
+  const heldExisting = getHeldSse(sseKey)
+  if (heldExisting) {
+    const r = await attemptSseToolsListWithHeld(heldExisting, sseKey, userHeaders, opSignal)
+    if (r !== 'retry') return r
+  }
+
+  let legacySse: LegacySseBridge | null = null
   try {
-    let listRes: Response
+    const prepared = await prepareMcpPostTransport(sseBaseUrl, 'sse', userHeaders, opSignal)
+    if (!prepared.ok) {
+      return {
+        ok: false,
+        error: prepared.error,
+        diagnostics: connDiag('headers', null, false, prepared.error),
+      }
+    }
+
+    legacySse = prepared.legacySse!
+    const postHref = prepared.href
+
+    const session = await acquireSession(postHref, userHeaders, false, legacySse)
+    if (!session.ok) {
+      legacySse.dispose()
+      legacySse = null
+      return {
+        ok: false,
+        error: session.error,
+        diagnostics: session.diagnostics,
+        httpTrace: session.httpTrace,
+      }
+    }
+
+    const { href, sessionId } = session
+    const hadSidForList = !!(sessionId && sessionId.length > 0)
+
+    const listPayload = {
+      jsonrpc: '2.0' as const,
+      id: 2,
+      method: 'tools/list' as const,
+      params: {},
+    }
+    const listReqTrace = makePostRequestTrace(href, userHeaders, sessionId, listPayload)
+
+    let listRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
     try {
-      listRes = await mcpPost(
+      listRead = await postMcpRpcReadResult(
+        legacySse,
         href,
-        { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+        listPayload,
+        2,
         sessionId,
         opSignal,
         userHeaders,
       )
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      closeMcpSession(href, sessionId, userHeaders)
+      return {
+        ok: false,
+        error: message,
+        diagnostics: connDiag('tools/list', null, hadSidForList, message),
+        httpTrace: { request: listReqTrace, response: null },
+      }
+    }
+
+    if (listRead.error) {
+      closeMcpSession(href, sessionId, userHeaders)
+      return {
+        ok: false,
+        error: `tools/list 失败：${listRead.error.message}`,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+    if (listRead.httpError && listRead.result === undefined) {
+      closeMcpSession(href, sessionId, userHeaders)
+      return {
+        ok: false,
+        error: listRead.httpError,
+        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
+    }
+
+    const tools = normalizeTools(listRead.result)
+    const sid = listRead.sessionHeader ?? sessionId
+
+    putHeldSse(sseKey, {
+      bridge: legacySse,
+      postHref: href,
+      sessionId: sid,
+      userHeaders: { ...userHeaders },
+      lastUsedAt: Date.now(),
+      nextRpcId: 3,
+    })
+    legacySse = null
+
+    return { ok: true, tools, sseHeld: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      error: message,
+      diagnostics: connDiag('tools/list', null, false, message),
+    }
+  } finally {
+    if (legacySse) legacySse.dispose()
+  }
+}
+
+async function callMcpToolSseHeld(
+  sseBaseUrl: string,
+  name: string,
+  args: Record<string, unknown>,
+  userHeaders: Record<string, string>,
+): Promise<CallToolResult> {
+  const sseKey = makeSseHeldKey(sseBaseUrl, userHeaders)
+  const held = getHeldSse(sseKey)
+  if (!held) {
+    const detail =
+      'No held HTTP/SSE session; refresh tools list for this endpoint first.'
+    return {
+      ok: false,
+      error: detail,
+      errorI18n: { key: 'tools.sseNotHeld' },
+      diagnostics: connDiag('tools/call', null, false, detail),
+    }
+  }
+
+  const opSignal = AbortSignal.timeout(60_000)
+  const rpcId = held.nextRpcId++
+  const bodyObj = {
+    jsonrpc: '2.0' as const,
+    id: rpcId,
+    method: 'tools/call' as const,
+    params: { name, arguments: args },
+  }
+  const mergedHeaders = mergePostHeaders(userHeaders, held.sessionId)
+  const bodyStr = JSON.stringify(bodyObj)
+  const reqTrace: McpToolCallHttpTrace['request'] = {
+    method: 'POST',
+    url: held.postHref,
+    headersText: sortHeaderLinesFromRecord(mergedHeaders),
+    body: bodyStr,
+  }
+
+  let callRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
+  try {
+    callRead = await postMcpRpcReadResult(
+      held.bridge,
+      held.postHref,
+      bodyObj,
+      rpcId,
+      held.sessionId,
+      opSignal,
+      userHeaders,
+    )
+  } catch (e) {
+    disposeHeldSse(sseKey)
+    const message = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      error: message,
+      diagnostics: connDiag('tools/call', null, !!(held.sessionId && held.sessionId.length > 0), message),
+      httpTrace: { request: reqTrace, response: null },
+    }
+  }
+
+  const httpTrace: McpToolCallHttpTrace = {
+    request: reqTrace,
+    response: {
+      status: callRead.status,
+      statusText: '',
+      headersText: '',
+      body: callRead.raw,
+    },
+  }
+
+  if (callRead.error) {
+    disposeHeldSse(sseKey)
+    const hadSidForCall = !!(held.sessionId && held.sessionId.length > 0)
+    return {
+      ok: false,
+      error: `tools/call 失败：${callRead.error.message}`,
+      diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.error.message),
+      httpTrace,
+    }
+  }
+  if (callRead.httpError && callRead.result === undefined) {
+    disposeHeldSse(sseKey)
+    const hadSidForCall = !!(held.sessionId && held.sessionId.length > 0)
+    return {
+      ok: false,
+      error: callRead.httpError,
+      diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.httpError),
+      httpTrace,
+    }
+  }
+
+  const sid = callRead.sessionHeader
+  if (sid) held.sessionId = sid
+  touchHeldSse(sseKey)
+  return { ok: true, result: callRead.result, httpTrace }
+}
+
+export async function fetchMcpToolsList(
+  endpoint: string,
+  extraHeaders?: MCPHttpHeader[],
+  reuseSession = false,
+  transport: McpHttpTransport = 'streamable-http',
+): Promise<FetchToolsResult> {
+  const parsed = parseMcpEndpoint(endpoint)
+  if (!parsed.ok) return parsed
+
+  const headerErr = validateMcpExtraHeadersForFetch(extraHeaders)
+  if (headerErr) {
+    return {
+      ok: false,
+      error: headerErr.detailEn,
+      errorI18n: headerErr.detailI18n,
+      diagnostics: connDiag('headers', null, false, headerErr.detailEn, headerErr.detailI18n),
+    }
+  }
+
+  const userHeaders = mcpHeadersToRecord(extraHeaders)
+
+  if (transport === 'sse') {
+    return fetchMcpToolsListSse(parsed.href, userHeaders)
+  }
+
+  disposeAllHeldSseExcept(null)
+
+  const opSignal = AbortSignal.timeout(60_000)
+  const prepared = await prepareMcpPostTransport(parsed.href, transport, userHeaders, opSignal)
+  if (!prepared.ok) {
+    return {
+      ok: false,
+      error: prepared.error,
+      diagnostics: connDiag('headers', null, false, prepared.error),
+    }
+  }
+
+  const { href: postHref, legacySse } = prepared
+
+  try {
+    const session = await acquireSession(postHref, userHeaders, reuseSession, legacySse)
+    if (!session.ok) {
+      return {
+        ok: false,
+        error: session.error,
+        diagnostics: session.diagnostics,
+        httpTrace: session.httpTrace,
+      }
+    }
+
+    const { href, sessionId, cacheKey } = session
+    const hadSidForList = !!(sessionId && sessionId.length > 0)
+
+    const listPayload = {
+      jsonrpc: '2.0' as const,
+      id: 2,
+      method: 'tools/list' as const,
+      params: {},
+    }
+    const listReqTrace = makePostRequestTrace(href, userHeaders, sessionId, listPayload)
+
+    try {
+      let listRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
+      try {
+        listRead = await postMcpRpcReadResult(
+          legacySse,
+          href,
+          listPayload,
+          2,
+          sessionId,
+          opSignal,
+          userHeaders,
+        )
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
+        return {
+          ok: false,
+          error: message,
+          diagnostics: connDiag('tools/list', null, hadSidForList, message),
+          httpTrace: { request: listReqTrace, response: null },
+        }
+      }
+
+      if (listRead.error) {
+        if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
+        return {
+          ok: false,
+          error: `tools/list 失败：${listRead.error.message}`,
+          diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+          httpTrace: {
+            request: listReqTrace,
+            response: {
+              status: listRead.status,
+              statusText: '',
+              headersText: '',
+              body: listRead.raw,
+            },
+          },
+        }
+      }
+      if (listRead.httpError && listRead.result === undefined) {
+        if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
+        return {
+          ok: false,
+          error: listRead.httpError,
+          diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
+          httpTrace: {
+            request: listReqTrace,
+            response: {
+              status: listRead.status,
+              statusText: '',
+              headersText: '',
+              body: listRead.raw,
+            },
+          },
+        }
+      }
+
+      const tools = normalizeTools(listRead.result)
+      if (reuseSession) touchCachedSession(cacheKey)
+      return { ok: true, tools }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
@@ -439,43 +1049,16 @@ export async function fetchMcpToolsList(
         ok: false,
         error: message,
         diagnostics: connDiag('tools/list', null, hadSidForList, message),
+        httpTrace: { request: listReqTrace, response: null },
       }
-    }
-
-    const listRead = await readRpcResult(listRes, 2)
-    if (listRead.error) {
-      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
-      return {
-        ok: false,
-        error: `tools/list 失败：${listRead.error.message}`,
-        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.error.message),
+    } finally {
+      if (!reuseSession) {
+        closeMcpSession(href, sessionId, userHeaders)
+        invalidateMcpSessionCacheKey(cacheKey)
       }
-    }
-    if (listRead.httpError && listRead.result === undefined) {
-      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
-      return {
-        ok: false,
-        error: listRead.httpError,
-        diagnostics: connDiag('tools/list', listRead.status, hadSidForList, listRead.httpError),
-      }
-    }
-
-    const tools = normalizeTools(listRead.result)
-    if (reuseSession) touchCachedSession(cacheKey)
-    return { ok: true, tools }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
-    return {
-      ok: false,
-      error: message,
-      diagnostics: connDiag('tools/list', null, hadSidForList, message),
     }
   } finally {
-    if (!reuseSession) {
-      closeMcpSession(href, sessionId, userHeaders)
-      invalidateMcpSessionCacheKey(cacheKey)
-    }
+    legacySse?.dispose()
   }
 }
 
@@ -485,6 +1068,7 @@ export async function callMcpTool(
   args: Record<string, unknown>,
   extraHeaders?: MCPHttpHeader[],
   reuseSession = false,
+  transport: McpHttpTransport = 'streamable-http',
 ): Promise<CallToolResult> {
   const parsed = parseMcpEndpoint(endpoint)
   if (!parsed.ok) return parsed
@@ -492,18 +1076,52 @@ export async function callMcpTool(
   const name = toolName.trim()
   if (!name) return { ok: false, error: '工具名称为空' }
 
+  const headerErr = validateMcpExtraHeadersForFetch(extraHeaders)
+  if (headerErr) {
+    return {
+      ok: false,
+      error: headerErr.detailEn,
+      errorI18n: headerErr.detailI18n,
+      diagnostics: connDiag('headers', null, false, headerErr.detailEn, headerErr.detailI18n),
+    }
+  }
+
   const userHeaders = mcpHeadersToRecord(extraHeaders)
 
-  const session = await acquireSession(parsed.href, userHeaders, reuseSession)
-  if (!session.ok) return { ok: false, error: session.error, diagnostics: session.diagnostics }
+  if (transport === 'sse') {
+    return callMcpToolSseHeld(parsed.href, name, args, userHeaders)
+  }
 
-  const { href, sessionId, cacheKey } = session
-  const hadSidForCall = !!(sessionId && sessionId.length > 0)
+  disposeAllHeldSseExcept(null)
+
   const opSignal = AbortSignal.timeout(60_000)
+  const prepared = await prepareMcpPostTransport(parsed.href, transport, userHeaders, opSignal)
+  if (!prepared.ok) {
+    return {
+      ok: false,
+      error: prepared.error,
+      diagnostics: connDiag('headers', null, false, prepared.error),
+    }
+  }
 
-  const TOOLS_CALL_RPC_ID = 3
+  const { href: postHref, legacySse } = prepared
 
   try {
+    const session = await acquireSession(postHref, userHeaders, reuseSession, legacySse)
+    if (!session.ok) {
+      return {
+        ok: false,
+        error: session.error,
+        diagnostics: session.diagnostics,
+        httpTrace: session.httpTrace,
+      }
+    }
+
+    const { href, sessionId, cacheKey } = session
+    const hadSidForCall = !!(sessionId && sessionId.length > 0)
+
+    const TOOLS_CALL_RPC_ID = 3
+
     const mergedHeaders = mergePostHeaders(userHeaders, sessionId)
     const bodyObj = {
       jsonrpc: '2.0' as const,
@@ -519,14 +1137,59 @@ export async function callMcpTool(
       body: bodyStr,
     }
 
-    let callRes: Response
     try {
-      callRes = await fetch(href, {
-        method: 'POST',
-        headers: mergedHeaders,
-        body: bodyStr,
-        signal: opSignal,
-      })
+      let callRead: Awaited<ReturnType<typeof postMcpRpcReadResult>>
+      try {
+        callRead = await postMcpRpcReadResult(
+          legacySse,
+          href,
+          bodyObj,
+          TOOLS_CALL_RPC_ID,
+          sessionId,
+          opSignal,
+          userHeaders,
+        )
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
+        return {
+          ok: false,
+          error: message,
+          diagnostics: connDiag('tools/call', null, hadSidForCall, message),
+          httpTrace: { request: reqTrace, response: null },
+        }
+      }
+
+      const httpTrace: McpToolCallHttpTrace = {
+        request: reqTrace,
+        response: {
+          status: callRead.status,
+          statusText: '',
+          headersText: '',
+          body: callRead.raw,
+        },
+      }
+
+      if (callRead.error) {
+        if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
+        return {
+          ok: false,
+          error: `tools/call 失败：${callRead.error.message}`,
+          diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.error.message),
+          httpTrace,
+        }
+      }
+      if (callRead.httpError && callRead.result === undefined) {
+        if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
+        return {
+          ok: false,
+          error: callRead.httpError,
+          diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.httpError),
+          httpTrace,
+        }
+      }
+      if (reuseSession) touchCachedSession(cacheKey)
+      return { ok: true, result: callRead.result, httpTrace }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
@@ -536,53 +1199,13 @@ export async function callMcpTool(
         diagnostics: connDiag('tools/call', null, hadSidForCall, message),
         httpTrace: { request: reqTrace, response: null },
       }
-    }
-
-    const responseText = await callRes.text()
-    const ct = callRes.headers.get('content-type') ?? ''
-    const httpTrace: McpToolCallHttpTrace = {
-      request: reqTrace,
-      response: {
-        status: callRes.status,
-        statusText: callRes.statusText,
-        headersText: sortHeaderLinesFromFetchHeaders(callRes.headers),
-        body: responseText,
-      },
-    }
-
-    const callRead = parseRpcFromRaw(callRes.status, ct, responseText, TOOLS_CALL_RPC_ID, callRes.ok)
-    if (callRead.error) {
-      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
-      return {
-        ok: false,
-        error: `tools/call 失败：${callRead.error.message}`,
-        diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.error.message),
-        httpTrace,
+    } finally {
+      if (!reuseSession) {
+        closeMcpSession(href, sessionId, userHeaders)
+        invalidateMcpSessionCacheKey(cacheKey)
       }
-    }
-    if (callRead.httpError && callRead.result === undefined) {
-      if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
-      return {
-        ok: false,
-        error: callRead.httpError,
-        diagnostics: connDiag('tools/call', callRead.status, hadSidForCall, callRead.httpError),
-        httpTrace,
-      }
-    }
-    if (reuseSession) touchCachedSession(cacheKey)
-    return { ok: true, result: callRead.result, httpTrace }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)
-    return {
-      ok: false,
-      error: message,
-      diagnostics: connDiag('tools/call', null, hadSidForCall, message),
     }
   } finally {
-    if (!reuseSession) {
-      closeMcpSession(href, sessionId, userHeaders)
-      invalidateMcpSessionCacheKey(cacheKey)
-    }
+    legacySse?.dispose()
   }
 }

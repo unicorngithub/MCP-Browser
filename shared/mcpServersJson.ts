@@ -87,7 +87,6 @@ export function parseMcpServersSetList(
       url,
       createdAt,
       ...(headers?.length ? { headers } : {}),
-      ...(row.reuseMcpSession === true ? { reuseMcpSession: true } : {}),
     })
   }
 
@@ -150,7 +149,6 @@ export function parseMcpServersImportJson(
       url,
       createdAt,
       ...(headers?.length ? { headers } : {}),
-      ...(item.reuseMcpSession === true ? { reuseMcpSession: true } : {}),
     }
     servers.push(entry)
   }

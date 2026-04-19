@@ -50,12 +50,12 @@ describe('parseMcpServersSetList', () => {
     if (!r.ok) expect(r.error).toContain('headers')
   })
 
-  it('accepts reuseMcpSession true and rejects non-boolean', () => {
+  it('ignores valid reuseMcpSession on input and rejects non-boolean', () => {
     const ok = parseMcpServersSetList([
       { id: 'a', name: 'A', url: 'https://a.com/m', createdAt: 1, reuseMcpSession: true },
     ])
     expect(ok.ok).toBe(true)
-    if (ok.ok) expect(ok.servers[0].reuseMcpSession).toBe(true)
+    if (ok.ok) expect(ok.servers[0].reuseMcpSession).toBeUndefined()
 
     const bad = parseMcpServersSetList([
       { id: 'b', name: 'B', url: 'https://b.com/m', createdAt: 1, reuseMcpSession: 'yes' as unknown as boolean },

@@ -73,12 +73,11 @@ function unpackServer(row: McpServerDisk): MCPServer {
     url: row.url,
     createdAt: row.createdAt,
     ...(headers?.length ? { headers } : {}),
-    ...(typeof row.reuseMcpSession === 'boolean' && row.reuseMcpSession ? { reuseMcpSession: true } : {}),
   }
 }
 
 function toDisk(server: MCPServer): McpServerDisk {
-  const { headers, ...rest } = server
+  const { headers, reuseMcpSession: _omitReuse, ...rest } = server
   const packed = packHeaders(headers)
   return { ...rest, ...packed }
 }

@@ -40,11 +40,19 @@ export type AppShellStrings = {
   zoomIn: string
   zoomOut: string
   toggleFullscreen: string
+  /** 设置 → 窗口模式 */
+  windowModeLabel: string
+  windowModeSingle: string
+  windowModeMulti: string
   settings: string
   appearance: string
   themeLight: string
   themeDark: string
   themeSystem: string
+  /** 设置 → 语言 */
+  languageLabel: string
+  languageEnglish: string
+  languageZhCN: string
   window: string
   minimize: string
   zoom: string
@@ -92,11 +100,17 @@ const ZH: AppShellStrings = {
   zoomIn: '放大',
   zoomOut: '缩小',
   toggleFullscreen: '全屏',
+  windowModeLabel: '窗口模式',
+  windowModeSingle: '单窗口模式',
+  windowModeMulti: '多窗口模式',
   settings: '设置',
   appearance: '外观',
   themeLight: '浅色',
   themeDark: '深色',
   themeSystem: '跟随系统',
+  languageLabel: '语言',
+  languageEnglish: 'English',
+  languageZhCN: '简体中文',
   window: '窗口',
   minimize: '最小化',
   zoom: '缩放',
@@ -134,17 +148,23 @@ const EN: AppShellStrings = {
   cut: 'Cut',
   copy: 'Copy',
   paste: 'Paste',
-  view: 'Display',
+  view: 'View',
   reload: 'Refresh Interface',
   actualSize: 'Actual Size',
   zoomIn: 'Zoom In',
   zoomOut: 'Zoom Out',
   toggleFullscreen: 'Toggle Full Screen',
+  windowModeLabel: 'Window mode',
+  windowModeSingle: 'Single window',
+  windowModeMulti: 'Multi-tab',
   settings: 'Settings',
   appearance: 'Appearance',
   themeLight: 'Light',
   themeDark: 'Dark',
   themeSystem: 'Match System',
+  languageLabel: 'Language',
+  languageEnglish: 'English',
+  languageZhCN: 'Chinese (Simplified)',
   window: 'Window',
   minimize: 'Minimize',
   zoom: 'Zoom',

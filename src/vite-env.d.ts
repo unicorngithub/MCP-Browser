@@ -7,11 +7,13 @@ import type {
   ImportServersJsonResult,
   MCPHttpHeader,
   MCPServer,
+  McpHttpTransport,
   SetMcpServersResult,
 } from '../shared/types'
 
 import type { AppLanguage } from '../shared/locale'
 import type { ThemePreference } from '../shared/theme'
+import type { WindowModePreference } from '../shared/windowMode'
 
 export interface AppThemeApi {
   notifyPreferenceChanged(pref: ThemePreference): void
@@ -20,6 +22,7 @@ export interface AppThemeApi {
 
 export interface AppLocaleApi {
   notifyLanguageChanged(lng: AppLanguage): void
+  onMenuLanguageSelect(handler: (lng: AppLanguage) => void): () => void
 }
 
 export interface AppShellMenuApi {
@@ -27,16 +30,28 @@ export interface AppShellMenuApi {
   onUsageGuideRequest(handler: () => void): () => void
 }
 
+export interface AppWorkspaceApi {
+  getWindowMode(): Promise<WindowModePreference>
+  setWindowMode(mode: WindowModePreference): Promise<{ ok: boolean }>
+  onWindowMode(handler: (mode: WindowModePreference) => void): () => void
+}
+
 export interface McpDesktopApi {
   getServers(): Promise<MCPServer[]>
   setServers(list: MCPServer[]): Promise<SetMcpServersResult>
-  fetchToolsList(url: string, headers?: MCPHttpHeader[], reuseSession?: boolean): Promise<FetchToolsResult>
+  fetchToolsList(
+    url: string,
+    headers?: MCPHttpHeader[],
+    reuseSession?: boolean,
+    transport?: McpHttpTransport,
+  ): Promise<FetchToolsResult>
   callTool(
     url: string,
     toolName: string,
     args: Record<string, unknown>,
     headers?: MCPHttpHeader[],
     reuseSession?: boolean,
+    transport?: McpHttpTransport,
   ): Promise<CallToolResult>
   exportServersJson(opts?: { redactHeaders?: boolean }): Promise<ExportServersJsonResult>
   importServersJson(): Promise<ImportServersJsonResult>
@@ -67,6 +82,7 @@ declare global {
     appTheme?: AppThemeApi
     appLocale?: AppLocaleApi
     appShellMenu?: AppShellMenuApi
+    appWorkspace?: AppWorkspaceApi
   }
 }
 

@@ -1,6 +1,6 @@
-# MCP BROWSER
+# MCP Browser
 
-**MCP BROWSER** is an open-source Electron desktop app for **managing MCP (Model Context Protocol) HTTP endpoints** and **browsing server tools** (`tools/list`): names, descriptions, and `inputSchema`.
+**MCP Browser** is an open-source Electron desktop app for **managing MCP (Model Context Protocol) HTTP endpoints** and **browsing server tools** (`tools/list`): names, descriptions, and `inputSchema`.
 
 **Author & maintainer:** **Guo's**.
 
@@ -15,13 +15,13 @@ English | [简体中文](README.zh-CN.md)
 Captured against **[MCP Feature Reference Server](https://example-server.modelcontextprotocol.io/)** — **`https://example-server.modelcontextprotocol.io/debug/mcp`** (Debug MCP App, Streamable HTTP, no OAuth). The root **`/mcp`** path on the same host may require authorization; see the official site for OAuth.
 
 <p align="center">
-  <img src="docs/images/app-window.png" alt="MCP BROWSER — main window: sidebar and tools panel" width="820" />
+  <img src="docs/images/app-window.png" alt="MCP Browser — main window: sidebar and tools panel" width="820" />
 </p>
 
 <p align="center"><em>Main window: default UI is Simplified Chinese (switch via sidebar EN / 中文; menu bar follows). Connected to the official Debug MCP sample — tool list and selected tool (description, <code>inputSchema</code>, tool test).</em></p>
 
 <p align="center">
-  <img src="docs/images/app-add-server.png" alt="MCP BROWSER — Add MCP server dialog with optional HTTP headers" width="820" />
+  <img src="docs/images/app-add-server.png" alt="MCP Browser — Add MCP server dialog with optional HTTP headers" width="820" />
 </p>
 
 <p align="center"><em>Add or edit an endpoint; optional headers (e.g. <code>Authorization</code>) for authenticated servers.</em></p>
@@ -30,10 +30,10 @@ Captured against **[MCP Feature Reference Server](https://example-server.modelco
 
 ## Features
 
-- Save, edit, and delete MCP server URLs; persist with **electron-store**
-- **Streamable HTTP** client: `initialize` → session (`Mcp-Session-Id`) → `notifications/initialized` → `tools/list` (spec-aligned)
-- Tool list and detail view (JSON `inputSchema`)
-- **UI i18n**: English and **简体中文** in the renderer (**react-i18next**); menu bar and native dialogs stay in sync via preload (`appLocale`) and main-process strings in `shared/appShellStrings.ts`
+- **Endpoints**: add, edit, remove MCP HTTP URLs; persisted with **electron-store**. **File** menu: **export / import** endpoint JSON for backup or migration.
+- **Window layout**: **Settings** → **Window mode** (below **Appearance**) — **single window** (default) or **multi-tab**. Each tab is a full workspace (sidebar + tools); **+** adds a tab; **×** closes a tab (at least one tab remains). Mode is stored separately (`mcp-browser-window-mode`).
+- **Connection & tools**: choose **MCP HTTP transport** in the main toolbar (e.g. Streamable HTTP / SSE, depending on the server). Under Streamable HTTP the client follows `initialize` → `Mcp-Session-Id` → `notifications/initialized` → `tools/list`. Tool list and detail (`inputSchema`), tool calls, and optional HTTP trace views.
+- **UI & menus**: English and **简体中文** (**react-i18next**); **Settings → Appearance** (light / dark / system); **Help** (user guide, check for updates, MCP spec link, etc.). Menu bar strings stay aligned via preload (`appLocale`, `appShellStrings`).
 - **React 18** + **TypeScript** + **Vite** + **Tailwind CSS** + **Zustand**
 
 ## Requirements
@@ -50,23 +50,29 @@ pnpm install
 pnpm dev
 ```
 
-Production build (run on the target OS when packaging):
+Compile only (`tsc` + Vite; outputs under `dist/`, `dist-electron/`):
 
 ```bash
 pnpm build
 ```
 
+Production installers (run on the target OS when packaging; electron-builder per config):
+
+```bash
+pnpm dist
+```
+
 Portable output only (`release/<version>/win-unpacked/`, etc.), no NSIS installer:
 
 ```bash
-pnpm run build:dir
+pnpm run dist:dir
 ```
 
 Clean `dist/`, `dist-electron/`, `release/`, and Vite cache before a full rebuild:
 
 ```bash
 pnpm clean
-pnpm rebuild   # clean + pnpm build
+pnpm rebuild   # clean + pnpm dist
 ```
 
 ### pnpm + Electron
@@ -75,44 +81,21 @@ If Electron fails to download or start under pnpm, ensure `package.json` include
 
 ## macOS: Gatekeeper and quarantine
 
-Prebuilt downloads are **not Apple-notarized**. macOS may block launch or show **“MCP BROWSER is damaged and can’t be opened”** — often a **Gatekeeper / quarantine** artifact, not a corrupted binary.
+Prebuilt releases are **not Apple-notarized**. If launch is blocked or you see **“MCP Browser is damaged and can’t be opened”**, it is usually **Gatekeeper / quarantine**, **not** a broken download.
 
-### 1. Privacy & Security
-
-1. From the menu bar, open the **Apple menu** () > **System Settings** — on macOS Monterey and earlier, **System Preferences**.
-2. Go to **Privacy & Security** (older releases: **Security & Privacy**).
-3. Under **Security**, check **Allow applications downloaded from**. If **Anywhere** is available, select it.
-
-### 2. If “Anywhere” is missing
-
-Enable downloads from any source (administrative):
+**First**, clear quarantine on the installed `.app` (adjust the path if you installed elsewhere):
 
 ```bash
-sudo spctl --master-disable
+sudo xattr -r -d com.apple.quarantine /Applications/MCP\ Browser.app
 ```
 
-Re-harden when finished testing:
+If the app is under your user folder (e.g. `~/Applications`):
 
 ```bash
-sudo spctl --master-enable
+sudo xattr -r -d com.apple.quarantine ~/Applications/MCP\ Browser.app
 ```
 
-### 3. Remove quarantine from the installed app
-
-Clear the **com.apple.quarantine** extended attribute so the system stops treating the bundle as internet-sourced:
-
-```bash
-sudo xattr -r -d com.apple.quarantine /Applications/MCP\ BROWSER.app
-```
-
-Change the path if you installed elsewhere (e.g. `~/Applications/...`).
-
-### Command reference
-
-| Command | Scope | What it addresses |
-|--------|--------|-------------------|
-| `sudo xattr -r -d com.apple.quarantine <path-to-.app>` | **Single application** | Removes quarantine metadata for that bundle only; preferred when you trust this app. |
-| `sudo spctl --master-disable` | **System-wide Gatekeeper** | Allows unsigned / unnotarized apps globally until re-enabled; use sparingly. |
+If it still won’t open, use **System Settings → Privacy & Security** to allow the app. As a last resort you can temporarily run `sudo spctl --master-disable`, then `sudo spctl --master-enable` when done. More detail: [docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md](docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md).
 
 ## Project layout
 
@@ -133,17 +116,18 @@ Change the path if you installed elsewhere (e.g. `~/Applications/...`).
 | Script | Description |
 | ------ | ----------- |
 | `pnpm dev` | Vite + Electron development |
-| `pnpm build` | `tsc` + Vite + electron-builder (installers per config) |
-| `pnpm run build:dir` | `tsc` + Vite + `electron-builder --dir` (unpacked app only) |
+| `pnpm build` | `tsc` + Vite only (no installer) |
+| `pnpm dist` | `pnpm build` then electron-builder (installers per config) |
+| `pnpm run dist:dir` | `pnpm build` then `electron-builder --dir` (unpacked app only) |
 | `pnpm clean` | Remove `dist/`, `dist-electron/`, `release/`, `node_modules/.vite` |
-| `pnpm rebuild` | `pnpm clean` then `pnpm build` |
+| `pnpm rebuild` | `pnpm clean` then `pnpm dist` |
 | `pnpm test` | Vitest (E2E uses the official Debug MCP HTTP demo; needs network, skipped on Linux; does **not** overwrite README screenshots) |
 | `pnpm test:update-screenshots` | Sets `MCP_BROWSER_UPDATE_SCREENSHOTS=1` to refresh `docs/images/*.png` and `test/screenshots/e2e.png` |
 | `pnpm preview` | Vite preview of the renderer build |
 
 ## Security notes
 
-- **contextIsolation** enabled; preload exposes narrow APIs (`mcpDesktop`, `updaterIpc`), not full `ipcRenderer`
+- **contextIsolation** enabled; preload exposes narrow APIs (`mcpDesktop`, `updaterIpc`, theme/locale/menu/workspace helpers), not full `ipcRenderer`
 - MCP HTTP traffic runs in the **main process** (no renderer CORS issues)
 
 ## License

@@ -72,7 +72,7 @@ describeE2e('mcp-browser e2e', () => {
 
   test('startup', async () => {
     const title = await page.title()
-    expect(title).eq('MCP BROWSER')
+    expect(title).eq('MCP Browser')
   })
 
   test(

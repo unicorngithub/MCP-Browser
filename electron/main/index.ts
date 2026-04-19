@@ -9,8 +9,23 @@ import { update } from './update'
 import { registerMcpIpc } from './ipcMcp'
 import { installAppMenu, syncNativeThemeSource } from './appMenu'
 import { openExternalUrlIfAllowed } from './openExternalPolicy'
+import { getWindowModePreference, setWindowModePreference } from './windowModeStore'
+import type { WindowModePreference } from '../../shared/windowMode'
 
 registerMcpIpc()
+
+ipcMain.handle('app:get-window-mode', (): WindowModePreference => getWindowModePreference())
+
+ipcMain.handle('app:set-window-mode', (_evt, mode: unknown) => {
+  if (mode !== 'single' && mode !== 'multi') return { ok: false as const }
+  const m = mode as WindowModePreference
+  setWindowModePreference(m)
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed()) w.webContents.send('app-menu:window-mode', m)
+  }
+  installAppMenu()
+  return { ok: true as const }
+})
 
 ipcMain.on('app:theme-preference-changed', (_, pref: unknown) => {
   if (pref !== 'light' && pref !== 'dark' && pref !== 'system') return
@@ -24,7 +39,7 @@ ipcMain.on('app:language-changed', (_, lng: unknown) => {
   installAppMenu(undefined, lng as AppLanguage)
 })
 
-app.setName('MCP BROWSER')
+app.setName('MCP Browser')
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -66,7 +81,7 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'MCP BROWSER',
+    title: 'MCP Browser',
     width: 1180,
     height: 720,
     minWidth: 880,
