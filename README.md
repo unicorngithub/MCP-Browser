@@ -31,7 +31,7 @@ Captured against **[MCP Feature Reference Server](https://example-server.modelco
 ## Features
 
 - **Endpoints**: add, edit, remove MCP HTTP URLs; persisted with **electron-store**. **File** menu: **export / import** endpoint JSON for backup or migration.
-- **Window layout**: **Display** → **Window mode** (below **Refresh**) — **single window** (default) or **multi-tab**. Each tab is a full workspace (sidebar + tools); **+** adds a tab; **×** closes a tab (at least one tab remains). Mode is stored separately (`mcp-browser-window-mode`).
+- **Window layout**: **Settings** → **Window mode** (below **Appearance**) — **single window** (default) or **multi-tab**. Each tab is a full workspace (sidebar + tools); **+** adds a tab; **×** closes a tab (at least one tab remains). Mode is stored separately (`mcp-browser-window-mode`).
 - **Connection & tools**: choose **MCP HTTP transport** in the main toolbar (e.g. Streamable HTTP / SSE, depending on the server). Under Streamable HTTP the client follows `initialize` → `Mcp-Session-Id` → `notifications/initialized` → `tools/list`. Tool list and detail (`inputSchema`), tool calls, and optional HTTP trace views.
 - **UI & menus**: English and **简体中文** (**react-i18next**); **Settings → Appearance** (light / dark / system); **Help** (user guide, check for updates, MCP spec link, etc.). Menu bar strings stay aligned via preload (`appLocale`, `appShellStrings`).
 - **React 18** + **TypeScript** + **Vite** + **Tailwind CSS** + **Zustand**

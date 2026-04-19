@@ -332,6 +332,12 @@ function broadcastWindowMode(mode: WindowModePreference): void {
   }
 }
 
+function broadcastAppLanguage(lng: AppLanguage): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed()) w.webContents.send('app-menu:language', lng)
+  }
+}
+
 /**
  * 应用菜单：文件 / 编辑 / 显示 / 设置 / 帮助；macOS 另含应用菜单与「窗口」菜单。
  * Windows / Linux 单窗口，不重复提供「窗口」菜单（最小化等用标题栏即可）。
@@ -405,32 +411,6 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
       submenu: [
         { label: s.reload, role: 'reload', accelerator: 'CmdOrCtrl+R' },
         { type: 'separator' },
-        {
-          label: s.windowModeLabel,
-          submenu: [
-            {
-              label: s.windowModeSingle,
-              type: 'radio',
-              checked: windowMode === 'single',
-              click: () => {
-                setWindowModePreference('single')
-                broadcastWindowMode('single')
-                installAppMenu(menuTheme, menuLang)
-              },
-            },
-            {
-              label: s.windowModeMulti,
-              type: 'radio',
-              checked: windowMode === 'multi',
-              click: () => {
-                setWindowModePreference('multi')
-                broadcastWindowMode('multi')
-                installAppMenu(menuTheme, menuLang)
-              },
-            },
-          ],
-        },
-        { type: 'separator' },
         { label: s.actualSize, role: 'resetZoom' },
         { label: s.zoomIn, role: 'zoomIn', accelerator: 'CmdOrCtrl+=' },
         { label: s.zoomOut, role: 'zoomOut', accelerator: 'CmdOrCtrl+-' },
@@ -472,6 +452,55 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
                 syncNativeThemeSource('system')
                 installAppMenu('system')
                 sendThemeToRenderer('system')
+              },
+            },
+          ],
+        },
+        {
+          label: s.languageLabel,
+          submenu: [
+            {
+              label: s.languageEnglish,
+              type: 'radio',
+              checked: menuLang === 'en',
+              click: () => {
+                installAppMenu(menuTheme, 'en')
+                broadcastAppLanguage('en')
+              },
+            },
+            {
+              label: s.languageZhCN,
+              type: 'radio',
+              checked: menuLang === 'zh-CN',
+              click: () => {
+                installAppMenu(menuTheme, 'zh-CN')
+                broadcastAppLanguage('zh-CN')
+              },
+            },
+          ],
+        },
+        { type: 'separator' },
+        {
+          label: s.windowModeLabel,
+          submenu: [
+            {
+              label: s.windowModeSingle,
+              type: 'radio',
+              checked: windowMode === 'single',
+              click: () => {
+                setWindowModePreference('single')
+                broadcastWindowMode('single')
+                installAppMenu(menuTheme, menuLang)
+              },
+            },
+            {
+              label: s.windowModeMulti,
+              type: 'radio',
+              checked: windowMode === 'multi',
+              click: () => {
+                setWindowModePreference('multi')
+                broadcastWindowMode('multi')
+                installAppMenu(menuTheme, menuLang)
               },
             },
           ],

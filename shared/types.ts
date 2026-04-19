@@ -16,7 +16,10 @@ export interface MCPServer {
   createdAt: number
   /** 可选；对每个请求（含 initialize / tools / DELETE 会话）附加 */
   headers?: MCPHttpHeader[]
-  /** 为 true 时对该端点复用 MCP 会话（拉列表与调工具）；随本地端点配置持久化 */
+  /**
+   * 历史/导入字段：解析 JSON 时可出现；本地端点列表不落盘，运行时复用开关见
+   * `mcpSessionReuseStore`（按工作区隔离，每次启动默认关）。
+   */
   reuseMcpSession?: boolean
 }
 

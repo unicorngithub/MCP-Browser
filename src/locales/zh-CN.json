@@ -105,7 +105,7 @@
     "toolbarAria": "连接与操作",
     "sectionTools": "工具",
     "sessionReuseShort": "复用会话",
-    "sessionReuseTitle": "按当前端点保存：开启后，该端点的拉取工具列表与调用工具会复用 MCP 会话（减少 initialize 等握手），并写入本地端点配置；下次打开应用或切换回该端点仍有效。约 15 分钟无操作会过期并自动重建。仅在使用 Streamable HTTP 传输时可用；HTTP/SSE 需保持独立 SSE 连接，不提供此项。",
+    "sessionReuseTitle": "仅本次运行有效；不同工作区互不同步。开启后，当前工作区内该端点的拉取工具列表与调用工具会复用 MCP 会话（减少 initialize 等握手）；关闭应用后会恢复为关，不会写入端点配置。约 15 分钟无操作会过期并自动重建。仅在使用 Streamable HTTP 传输时可用；HTTP/SSE 需保持独立 SSE 连接，不提供此项。",
     "sseLinkShort": "SSE",
     "sseLinkTitle": "HTTP/SSE：成功刷新工具列表后会保持一条与服务端的长连接，后续 tools/call 在同一条连接上收发；约 15 分钟无操作会过期。切换端点、传输方式或连接失败时会关闭并需重新刷新列表。",
     "sseLinkConnecting": "连接中",

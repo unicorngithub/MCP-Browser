@@ -17,6 +17,7 @@ import type {
 } from '@shared/types'
 import { useWorkspaceId } from '@/context/WorkspaceContext'
 import { useAddressStore } from '@/stores/addressStore'
+import { useMcpSessionReuseStore } from '@/stores/mcpSessionReuseStore'
 import { getToolsStore, useToolsStore } from '@/stores/toolsStore'
 import { useWorkspaceUiStore } from '@/stores/workspaceUiStore'
 import { ToolArgsForm } from '@/components/mcp/ToolArgsForm'
@@ -173,7 +174,8 @@ function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
 export function ToolsPanel() {
   const { t, i18n } = useTranslation()
   const workspaceId = useWorkspaceId()
-  const { servers, setServerReuseMcpSession } = useAddressStore()
+  const servers = useAddressStore((s) => s.servers)
+  const setServerReuseMcpSession = useMcpSessionReuseStore((s) => s.setServerReuseMcpSession)
   const selectedId = useWorkspaceUiStore((s) => s.selectedServerByWs[workspaceId] ?? null)
   const selected = useMemo(
     () => servers.find((s) => s.id === selectedId) ?? null,
@@ -198,7 +200,9 @@ export function ToolsPanel() {
     setSelectedTool,
   } = useToolsStore()
 
-  const reuseMcpSession = selected?.reuseMcpSession === true
+  const reuseMcpSession = useMcpSessionReuseStore((s) =>
+    selected?.id ? s.isReuseMcpSession(workspaceId, selected.id) : false,
+  )
   /** 与主进程一致：SSE 传输不缓存会话，请求层始终传 reuseSession=false */
   const reuseMcpSessionEffective = reuseMcpSession && mcpHttpTransport !== 'sse'
 
@@ -419,7 +423,8 @@ export function ToolsPanel() {
     const tr = st.mcpHttpTransport
     const reuse =
       selected != null
-        ? selected.reuseMcpSession === true && tr !== 'sse'
+        ? useMcpSessionReuseStore.getState().isReuseMcpSession(workspaceId, selected.id) &&
+          tr !== 'sse'
         : st.lastReuseMcpSession && tr !== 'sse'
     if (u) void fetchForUrl(u, h, reuse)
   }, [selected, lastUrl, lastHeaders, fetchForUrl, workspaceId])
@@ -429,10 +434,12 @@ export function ToolsPanel() {
       const v = e.target.value as McpHttpTransport
       setMcpHttpTransport(v)
       if (!selected?.url) return
-      const reuse = selected.reuseMcpSession === true && v !== 'sse'
+      const reuse =
+        useMcpSessionReuseStore.getState().isReuseMcpSession(workspaceId, selected.id) &&
+        v !== 'sse'
       void fetchForUrl(selected.url, selected.headers, reuse)
     },
-    [selected, setMcpHttpTransport, fetchForUrl],
+    [selected, setMcpHttpTransport, fetchForUrl, workspaceId],
   )
 
   const copyUrl = useCallback(async () => {
@@ -652,7 +659,7 @@ export function ToolsPanel() {
                     aria-checked={reuseMcpSession}
                     aria-label={t('tools.sessionReuseTitle')}
                     onClick={() => {
-                      void setServerReuseMcpSession(selected.id, !reuseMcpSession)
+                      setServerReuseMcpSession(workspaceId, selected.id, !reuseMcpSession)
                     }}
                     className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 ${
                       reuseMcpSession

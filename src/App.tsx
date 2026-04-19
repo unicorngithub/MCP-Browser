@@ -8,9 +8,11 @@ import { ToolsPanel } from '@/components/mcp/ToolsPanel'
 import { WorkspaceTabBar } from '@/components/workspace/WorkspaceTabBar'
 import { WorkspaceProvider, useWorkspaceId } from '@/context/WorkspaceContext'
 import { useAddressStore } from '@/stores/addressStore'
+import { useMcpSessionReuseStore } from '@/stores/mcpSessionReuseStore'
 import { useToolsStore } from '@/stores/toolsStore'
 import { DEFAULT_WORKSPACE_ID, useWorkspaceUiStore } from '@/stores/workspaceUiStore'
 import type { MCPHttpHeader, MCPServer } from '@shared/types'
+import { setAppLanguage } from '@/i18n/i18n'
 
 /** 单栏或多标签下，侧栏 + 工具区；按工作区隔离 tools 状态 */
 function McpWorkspaceShell({
@@ -29,11 +31,14 @@ function McpWorkspaceShell({
   )
   const fetchForUrl = useToolsStore((s) => s.fetchForUrl)
   const mcpHttpTransport = useToolsStore((s) => s.mcpHttpTransport)
+  const sessionReuseOn = useMcpSessionReuseStore((s) =>
+    selected?.id ? s.isReuseMcpSession(workspaceId, selected.id) : false,
+  )
 
   useEffect(() => {
-    const reuse = selected?.reuseMcpSession === true && mcpHttpTransport !== 'sse'
+    const reuse = sessionReuseOn && mcpHttpTransport !== 'sse'
     void fetchForUrl(selected?.url ?? null, selected?.headers, reuse)
-  }, [selected, fetchForUrl, mcpHttpTransport])
+  }, [selected, fetchForUrl, mcpHttpTransport, sessionReuseOn])
 
   return (
     <div className="relative z-10 flex min-h-0 min-w-0 flex-1">
@@ -60,6 +65,15 @@ export default function App() {
   useEffect(() => {
     void hydrate()
   }, [hydrate])
+
+  useEffect(() => {
+    const unsub = window.appLocale?.onMenuLanguageSelect?.((lng) => {
+      setAppLanguage(lng)
+    })
+    return () => {
+      unsub?.()
+    }
+  }, [])
 
   useEffect(() => {
     if (!window.appWorkspace) return () => {}

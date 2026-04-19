@@ -22,6 +22,7 @@ export interface AppThemeApi {
 
 export interface AppLocaleApi {
   notifyLanguageChanged(lng: AppLanguage): void
+  onMenuLanguageSelect(handler: (lng: AppLanguage) => void): () => void
 }
 
 export interface AppShellMenuApi {

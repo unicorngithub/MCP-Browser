@@ -105,7 +105,7 @@
     "toolbarAria": "Connection and actions",
     "sectionTools": "Tools",
     "sessionReuseShort": "Reuse session",
-    "sessionReuseTitle": "Saved per endpoint: when on, tools/list and tools/call reuse one MCP session for this server (fewer initialize handshakes) and the choice is stored in your local endpoint config. It persists across app restarts. Cache expires after ~15 minutes idle. Only available with Streamable HTTP; HTTP/SSE requires a dedicated SSE connection and does not use this option.",
+    "sessionReuseTitle": "This session only; each workspace has its own toggle. When on, tools/list and tools/call reuse one MCP session for this endpoint in the current workspace (fewer initialize handshakes). Not saved; defaults to off after each app launch. Cache expires after ~15 minutes idle. Only available with Streamable HTTP; HTTP/SSE requires a dedicated SSE connection and does not use this option.",
     "sseLinkShort": "SSE",
     "sseLinkTitle": "HTTP/SSE: after a successful tools/list refresh, one long-lived connection is kept; later tools/call uses the same link. Idle ~15 minutes may drop it. Changing endpoint, transport, or failures closes it—refresh the list again.",
     "sseLinkConnecting": "Connecting",

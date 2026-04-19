@@ -31,7 +31,7 @@
 ## 功能概览
 
 - **多地址管理**：增删改 MCP HTTP 端点，本地 **electron-store** 持久化；**文件** 菜单 **导出 / 导入** 端点 JSON（备份、迁移）。
-- **窗口模式**：**显示** → **窗口模式**（在「刷新界面」下方）— **单窗口**（默认）或 **多标签**；多标签时每页为完整工作区（侧栏 + 工具），**+** 新建、**×** 关闭（至少保留一页）；模式写入独立配置（`mcp-browser-window-mode`）。
+- **窗口模式**：**设置** → **窗口模式**（在「外观」下方）— **单窗口**（默认）或 **多标签**；多标签时每页为完整工作区（侧栏 + 工具），**+** 新建、**×** 关闭（至少保留一页）；模式写入独立配置（`mcp-browser-window-mode`）。
 - **连接与工具**：主工具栏可选 **MCP HTTP 传输**（如 Streamable HTTP / SSE，依服务端能力）；**Streamable HTTP** 下按规范完成 `initialize` → **`Mcp-Session-Id`** → `notifications/initialized` → **`tools/list`**；工具列表与详情（`inputSchema`）、工具调用与请求/响应查看。
 - **界面与菜单**：中英界面（**react-i18next**）；**设置 → 外观**（浅色 / 深色 / 跟随系统）；**帮助**（使用说明、检查更新、MCP 规范链接等）；菜单与原生对话框与界面语言同步（`appLocale`、`appShellStrings`）。
 - **技术栈**：React 18、TypeScript、Vite、Tailwind CSS、Zustand

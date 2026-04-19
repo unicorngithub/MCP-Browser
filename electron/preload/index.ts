@@ -120,6 +120,13 @@ contextBridge.exposeInMainWorld('appLocale', {
   notifyLanguageChanged(lng: AppLanguage) {
     if (lng === 'en' || lng === 'zh-CN') ipcRenderer.send('app:language-changed', lng)
   },
+  onMenuLanguageSelect(handler: (lng: AppLanguage) => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, lng: unknown) => {
+      if (lng === 'en' || lng === 'zh-CN') handler(lng)
+    }
+    ipcRenderer.on('app-menu:language', wrap)
+    return () => ipcRenderer.removeListener('app-menu:language', wrap)
+  },
 })
 
 contextBridge.exposeInMainWorld('appWorkspace', {
