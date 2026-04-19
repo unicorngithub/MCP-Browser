@@ -19,6 +19,7 @@
     "NOTICE"
   ],
   "icon": "build/icon.png",
+  "afterPack": "scripts/after-pack-win-icon.cjs",
   "mac": {
     "artifactName": "MCP-Browser_${version}.${ext}",
     "target": [
