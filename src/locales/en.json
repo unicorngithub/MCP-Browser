@@ -5,6 +5,12 @@
     "switchToEn": "Switch to English",
     "switchToZh": "Switch to Chinese"
   },
+  "workspace": {
+    "tabLabel": "Workspace {{index}}",
+    "addTab": "New tab (same layout as current)",
+    "closeTab": "Close this workspace",
+    "tabListAria": "Workspace tabs"
+  },
   "sidebar": {
     "title": "Endpoints & tools",
     "subtitle": "Manage MCP HTTP endpoints and tools",

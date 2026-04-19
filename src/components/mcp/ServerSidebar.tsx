@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { MCPServer } from '@shared/types'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import UpdateModal from '@/components/update/Modal'
+import { useWorkspaceId } from '@/context/WorkspaceContext'
 import { useAddressStore } from '@/stores/addressStore'
+import { useWorkspaceUiStore } from '@/stores/workspaceUiStore'
 
 interface ServerSidebarProps {
   onAdd: () => void
@@ -12,7 +14,15 @@ interface ServerSidebarProps {
 
 export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const { t } = useTranslation()
-  const { servers, selectedId, select, removeServer, reorderServers, ready } = useAddressStore()
+  const workspaceId = useWorkspaceId()
+  const { servers, removeServer, reorderServers, ready } = useAddressStore()
+  const selectedId = useWorkspaceUiStore((s) => s.selectedServerByWs[workspaceId] ?? null)
+  const select = useCallback(
+    (id: string | null) => {
+      useWorkspaceUiStore.getState().setSelectedForWorkspace(workspaceId, id)
+    },
+    [workspaceId],
+  )
   const dragFromRef = useRef<number | null>(null)
   const [dropBefore, setDropBefore] = useState<number | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)

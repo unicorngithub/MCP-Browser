@@ -5,6 +5,12 @@
     "switchToEn": "切换为英文",
     "switchToZh": "切换到中文"
   },
+  "workspace": {
+    "tabLabel": "工作区 {{index}}",
+    "addTab": "新建一页（与当前相同布局）",
+    "closeTab": "关闭此工作区",
+    "tabListAria": "工作区标签"
+  },
   "sidebar": {
     "title": "端点与工具",
     "subtitle": "管理基于 HTTP 的 MCP 端点及工具列表",

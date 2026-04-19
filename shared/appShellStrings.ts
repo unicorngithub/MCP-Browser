@@ -40,6 +40,10 @@ export type AppShellStrings = {
   zoomIn: string
   zoomOut: string
   toggleFullscreen: string
+  /** 显示 → 窗口模式 */
+  windowModeLabel: string
+  windowModeSingle: string
+  windowModeMulti: string
   settings: string
   appearance: string
   themeLight: string
@@ -92,6 +96,9 @@ const ZH: AppShellStrings = {
   zoomIn: '放大',
   zoomOut: '缩小',
   toggleFullscreen: '全屏',
+  windowModeLabel: '窗口模式',
+  windowModeSingle: '单窗口模式',
+  windowModeMulti: '多窗口模式',
   settings: '设置',
   appearance: '外观',
   themeLight: '浅色',
@@ -140,6 +147,9 @@ const EN: AppShellStrings = {
   zoomIn: 'Zoom In',
   zoomOut: 'Zoom Out',
   toggleFullscreen: 'Toggle Full Screen',
+  windowModeLabel: 'Window mode',
+  windowModeSingle: 'Single window',
+  windowModeMulti: 'Multi-tab',
   settings: 'Settings',
   appearance: 'Appearance',
   themeLight: 'Light',

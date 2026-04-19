@@ -13,6 +13,7 @@ import type {
 
 import type { AppLanguage } from '../shared/locale'
 import type { ThemePreference } from '../shared/theme'
+import type { WindowModePreference } from '../shared/windowMode'
 
 export interface AppThemeApi {
   notifyPreferenceChanged(pref: ThemePreference): void
@@ -26,6 +27,12 @@ export interface AppLocaleApi {
 export interface AppShellMenuApi {
   onCheckForUpdatesRequest(handler: () => void): () => void
   onUsageGuideRequest(handler: () => void): () => void
+}
+
+export interface AppWorkspaceApi {
+  getWindowMode(): Promise<WindowModePreference>
+  setWindowMode(mode: WindowModePreference): Promise<{ ok: boolean }>
+  onWindowMode(handler: (mode: WindowModePreference) => void): () => void
 }
 
 export interface McpDesktopApi {
@@ -74,6 +81,7 @@ declare global {
     appTheme?: AppThemeApi
     appLocale?: AppLocaleApi
     appShellMenu?: AppShellMenuApi
+    appWorkspace?: AppWorkspaceApi
   }
 }
 

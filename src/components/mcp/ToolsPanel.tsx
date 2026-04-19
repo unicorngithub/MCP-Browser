@@ -15,8 +15,10 @@ import type {
   McpHttpTransport,
   McpToolCallHttpTrace,
 } from '@shared/types'
+import { useWorkspaceId } from '@/context/WorkspaceContext'
 import { useAddressStore } from '@/stores/addressStore'
-import { useToolsStore } from '@/stores/toolsStore'
+import { getToolsStore, useToolsStore } from '@/stores/toolsStore'
+import { useWorkspaceUiStore } from '@/stores/workspaceUiStore'
 import { ToolArgsForm } from '@/components/mcp/ToolArgsForm'
 import { ToolCallHttpDetailModal } from '@/components/mcp/ToolCallHttpDetailModal'
 import {
@@ -170,7 +172,9 @@ function McpConnectDiagnosticsBlock({ d }: { d: McpConnectDiagnostics }) {
 
 export function ToolsPanel() {
   const { t, i18n } = useTranslation()
-  const { servers, selectedId, setServerReuseMcpSession } = useAddressStore()
+  const workspaceId = useWorkspaceId()
+  const { servers, setServerReuseMcpSession } = useAddressStore()
+  const selectedId = useWorkspaceUiStore((s) => s.selectedServerByWs[workspaceId] ?? null)
   const selected = useMemo(
     () => servers.find((s) => s.id === selectedId) ?? null,
     [servers, selectedId],
@@ -411,14 +415,14 @@ export function ToolsPanel() {
   const retry = useCallback(() => {
     const u = selected?.url ?? lastUrl
     const h = selected?.headers ?? lastHeaders
-    const st = useToolsStore.getState()
+    const st = getToolsStore(workspaceId).getState()
     const tr = st.mcpHttpTransport
     const reuse =
       selected != null
         ? selected.reuseMcpSession === true && tr !== 'sse'
         : st.lastReuseMcpSession && tr !== 'sse'
     if (u) void fetchForUrl(u, h, reuse)
-  }, [selected, lastUrl, lastHeaders, fetchForUrl])
+  }, [selected, lastUrl, lastHeaders, fetchForUrl, workspaceId])
 
   const onHttpTransportChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {

@@ -1,6 +1,6 @@
-# MCP BROWSER
+# MCP Browser
 
-**MCP BROWSER** 是一款开源 **Electron 桌面应用**，用于 **管理 MCP（Model Context Protocol）HTTP 服务端点**，并 **浏览工具列表**（`tools/list`）：名称、说明与 **`inputSchema`**（JSON）。
+**MCP Browser** 是一款开源 **Electron 桌面应用**，用于 **管理 MCP（Model Context Protocol）HTTP 服务端点**，并 **浏览工具列表**（`tools/list`）：名称、说明与 **`inputSchema`**（JSON）。
 
 **作者 / 维护者：Guo's**
 
@@ -15,13 +15,13 @@
 配图基于 **[MCP Feature Reference Server](https://example-server.modelcontextprotocol.io/)** 的 **`https://example-server.modelcontextprotocol.io/debug/mcp`**（Debug MCP App，Streamable HTTP，无需 OAuth）。同域 **`/mcp`** 可能需鉴权，详见官网。
 
 <p align="center">
-  <img src="docs/images/app-window.png" alt="MCP BROWSER：主窗口侧栏与工具区" width="820" />
+  <img src="docs/images/app-window.png" alt="MCP Browser：主窗口侧栏与工具区" width="820" />
 </p>
 
 <p align="center"><em>主窗口：默认<strong>简体中文</strong>，侧栏可切换 <strong>EN / 中文</strong>；菜单栏与系统对话框与界面一致。已连接官方 Debug 示例 — 工具列表与详情（说明、<code>inputSchema</code>、工具测试）。</em></p>
 
 <p align="center">
-  <img src="docs/images/app-add-server.png" alt="MCP BROWSER：添加 MCP 地址弹窗（含可选自定义请求头）" width="820" />
+  <img src="docs/images/app-add-server.png" alt="MCP Browser：添加 MCP 地址弹窗（含可选自定义请求头）" width="820" />
 </p>
 
 <p align="center"><em>添加 / 编辑端点；可配置 <code>Authorization</code> 等请求头。</em></p>
@@ -30,10 +30,10 @@
 
 ## 功能概览
 
-- **多地址管理**：增删改 MCP HTTP 端点；**electron-store** 本地持久化
-- **协议流程**：**Streamable HTTP** 下 `initialize` → **`Mcp-Session-Id`** 会话 → `notifications/initialized` → **`tools/list`**
-- **工具浏览**：列表 + 详情（含 `inputSchema`）
-- **中英界面**：渲染进程 **react-i18next**；菜单栏与原生对话框经 preload（`appLocale`）与 `shared/appShellStrings.ts` 与界面同步
+- **多地址管理**：增删改 MCP HTTP 端点，本地 **electron-store** 持久化；**文件** 菜单 **导出 / 导入** 端点 JSON（备份、迁移）。
+- **窗口模式**：**显示** → **窗口模式**（在「刷新界面」下方）— **单窗口**（默认）或 **多标签**；多标签时每页为完整工作区（侧栏 + 工具），**+** 新建、**×** 关闭（至少保留一页）；模式写入独立配置（`mcp-browser-window-mode`）。
+- **连接与工具**：主工具栏可选 **MCP HTTP 传输**（如 Streamable HTTP / SSE，依服务端能力）；**Streamable HTTP** 下按规范完成 `initialize` → **`Mcp-Session-Id`** → `notifications/initialized` → **`tools/list`**；工具列表与详情（`inputSchema`）、工具调用与请求/响应查看。
+- **界面与菜单**：中英界面（**react-i18next**）；**设置 → 外观**（浅色 / 深色 / 跟随系统）；**帮助**（使用说明、检查更新、MCP 规范链接等）；菜单与原生对话框与界面语言同步（`appLocale`、`appShellStrings`）。
 - **技术栈**：React 18、TypeScript、Vite、Tailwind CSS、Zustand
 
 ## 环境要求
@@ -50,23 +50,29 @@ pnpm install
 pnpm dev
 ```
 
-打包（安装包与平台相关，建议在目标系统执行）：
+仅编译（`tsc` + Vite，产物在 `dist/`、`dist-electron/`）：
 
 ```bash
 pnpm build
 ```
 
+打包安装包（与平台相关，建议在目标系统执行；按 `electron-builder` 配置）：
+
+```bash
+pnpm dist
+```
+
 仅输出解包目录（如 `release/<版本>/win-unpacked/`，不生成 NSIS）：
 
 ```bash
-pnpm run build:dir
+pnpm run dist:dir
 ```
 
-清理后完整重编：
+清理后完整重编（含安装包）：
 
 ```bash
 pnpm clean
-pnpm rebuild   # clean 后再 build
+pnpm rebuild   # clean 后再 dist
 ```
 
 ### 使用 pnpm 时
@@ -75,44 +81,21 @@ pnpm rebuild   # clean 后再 build
 
 ## macOS：无法打开或提示「已损坏」
 
-预构建安装包 **未经过 Apple 公证**。系统可能拦截启动，或提示 **「应用已损坏，无法打开」** —— 多数是 **门禁（Gatekeeper）与隔离属性（quarantine）** 导致，并非文件真的损坏。
+预构建包 **未经 Apple 公证**，被拦截或提示「已损坏」多数是 **门禁（Gatekeeper）与下载隔离（quarantine）**，**不是**安装包损坏。
 
-### 1. 系统设置中的安全性
-
-1. 点击屏幕左上角 **苹果菜单**（）> **系统设置**（macOS Monterey 及更早为 **系统偏好设置**）。
-2. 打开 **隐私与安全性**（较早版本为 **安全性与隐私**）。
-3. 在 **安全性**（或「允许从以下位置下载的应用」）中，若出现 **任何来源**，请选中；若仅有「App Store」或「App Store 与已知开发者」，可继续下一步。
-
-### 2. 未显示「任何来源」时
-
-在「终端」中以管理员身份全局放宽门禁（慎用，用毕可恢复）：
+**优先**在已安装的 `.app` 上清除隔离（路径按实际安装位置修改）：
 
 ```bash
-sudo spctl --master-disable
+sudo xattr -r -d com.apple.quarantine /Applications/MCP\ Browser.app
 ```
 
-恢复默认策略：
+若安装在用户目录下，例如 `~/Applications`：
 
 ```bash
-sudo spctl --master-enable
+sudo xattr -r -d com.apple.quarantine ~/Applications/MCP\ Browser.app
 ```
 
-### 3. 移除该应用的隔离标记
-
-对**已安装**的 `.app` 删除 `com.apple.quarantine` 扩展属性，可消除多数误报的「已损坏」提示：
-
-```bash
-sudo xattr -r -d com.apple.quarantine /Applications/MCP\ BROWSER.app
-```
-
-若应用不在 `/Applications`，请改为实际路径（例如 `~/Applications/MCP BROWSER.app`）。
-
-### 命令对照
-
-| 命令 | 作用范围 | 典型用途 |
-|------|----------|----------|
-| `sudo xattr -r -d com.apple.quarantine <.app 路径>` | **单个应用** | 仅清除该套件的隔离标记；在信任该应用的前提下优先使用。 |
-| `sudo spctl --master-disable` | **整个系统** | 全局允许未签名 / 未公证应用，直至执行 `master-enable`；适合临时排障，不建议长期开启。 |
+仍无法打开时，到 **系统设置 → 隐私与安全性** 允许运行；必要时可临时 `sudo spctl --master-disable` 放宽全局门禁（用毕 `sudo spctl --master-enable`）。更细步骤见 [docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md](docs/macOS安装与无法打开说明（macOS-install-troubleshooting）.md)。
 
 ## 目录结构
 
@@ -133,17 +116,18 @@ sudo xattr -r -d com.apple.quarantine /Applications/MCP\ BROWSER.app
 | 命令 | 说明 |
 |------|------|
 | `pnpm dev` | 开发：Vite + Electron |
-| `pnpm build` | 类型检查 + Vite + electron-builder |
-| `pnpm run build:dir` | 仅解包目录（`electron-builder --dir`） |
+| `pnpm build` | 仅 `tsc` + Vite（不生成安装包） |
+| `pnpm dist` | 先 `pnpm build`，再 electron-builder（安装包） |
+| `pnpm run dist:dir` | 先 `pnpm build`，再 `electron-builder --dir`（仅解包目录） |
 | `pnpm clean` | 删除 `dist/`、`dist-electron/`、`release/`、`node_modules/.vite` |
-| `pnpm rebuild` | `clean` 后 `build` |
+| `pnpm rebuild` | `clean` 后 `dist` |
 | `pnpm test` | Vitest（E2E 需外网；Linux 跳过；**不**覆盖 README 配图） |
 | `pnpm test:update-screenshots` | 刷新 `docs/images/*.png` 等 |
 | `pnpm preview` | 预览 Vite 构建后的渲染进程 |
 
 ## 安全说明
 
-- 已启用 **contextIsolation**；preload 仅暴露受限 API（`mcpDesktop`、`updaterIpc`）
+- 已启用 **contextIsolation**；preload 仅暴露受限 API（`mcpDesktop`、`updaterIpc` 及主题 / 语言 / 菜单 / 窗口模式等辅助接口）
 - MCP **HTTP 请求在主进程** 发起，避免渲染进程 CORS 限制
 
 ## 开源协议
