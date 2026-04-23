@@ -10,7 +10,9 @@ import path from 'node:path'
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 process.env.MCP_BROWSER_UPDATE_SCREENSHOTS = '1'
 
-let r = spawnSync('pnpm', ['run', 'pretest'], { cwd: root, stdio: 'inherit', shell: true })
+let r = spawnSync('pnpm', ['run', 'build:test'], { cwd: root, stdio: 'inherit', shell: true })
 if (r.status !== 0) process.exit(r.status ?? 1)
-r = spawnSync('pnpm', ['exec', 'vitest', 'run'], { cwd: root, stdio: 'inherit', shell: true })
+r = spawnSync('pnpm', ['test'], { cwd: root, stdio: 'inherit', shell: true })
+if (r.status !== 0) process.exit(r.status ?? 1)
+r = spawnSync('pnpm', ['run', 'test:e2e'], { cwd: root, stdio: 'inherit', shell: true })
 process.exit(r.status ?? 0)

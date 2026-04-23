@@ -15,14 +15,16 @@ import {
   expect,
   test,
 } from 'vitest'
+import { startMcpE2eStubServer } from './mcpE2eStubServer'
 
 /**
- * 官方 MCP 托管示例之一：Debug MCP App（Streamable HTTP）。
- * 根路径 `/mcp` 需 OAuth；`/debug/mcp` 在官方页面列出，可无 Token 演示 tools/list。
+ * 默认：本机 HTTP 桩（无外网），CI 稳定。
+ * 设 `MCP_BROWSER_E2E_USE_OFFICIAL=1` 或 `true` 时改连官方示例（需外网，用于手测回归）。
  * @see https://example-server.modelcontextprotocol.io/
  */
-const DEMO_MCP_HTTP_URL = 'https://example-server.modelcontextprotocol.io/debug/mcp'
-const DEMO_MCP_DISPLAY_NAME = 'Debug MCP（官方示例）'
+const OFFICIAL_MCP_HTTP_URL = 'https://example-server.modelcontextprotocol.io/debug/mcp'
+const OFFICIAL_MCP_DISPLAY_NAME = 'Debug MCP（官方示例）'
+const STUB_MCP_DISPLAY_NAME = 'E2E 本地 MCP 桩'
 
 const root = path.join(__dirname, '..')
 const docsImagesDir = path.join(root, 'docs', 'images')
@@ -36,14 +38,31 @@ const shouldUpdateScreenshots =
 const skipE2e =
   process.env.MCP_BROWSER_SKIP_E2E === '1' || process.env.MCP_BROWSER_SKIP_E2E === 'true'
 
+const useOfficialDemo =
+  process.env.MCP_BROWSER_E2E_USE_OFFICIAL === '1' ||
+  process.env.MCP_BROWSER_E2E_USE_OFFICIAL === 'true'
+
 const describeE2e = skipE2e ? describe.skip : describe
 
 let electronApp: ElectronApplication
 let page: Page
 let e2eUserDataDir: string
+let closeMcpStub: (() => Promise<void>) | undefined
+let mcpHttpUrlForTest = ''
+let mcpDisplayNameForTest = ''
 
 describeE2e('mcp-browser e2e', () => {
   beforeAll(async () => {
+    if (useOfficialDemo) {
+      mcpHttpUrlForTest = OFFICIAL_MCP_HTTP_URL
+      mcpDisplayNameForTest = OFFICIAL_MCP_DISPLAY_NAME
+    } else {
+      const stub = await startMcpE2eStubServer()
+      mcpHttpUrlForTest = stub.mcpUrl
+      mcpDisplayNameForTest = STUB_MCP_DISPLAY_NAME
+      closeMcpStub = stub.close
+    }
+
     e2eUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-dm-e2e-'))
     electronApp = await electron.launch({
       args: ['.', '--no-sandbox', `--user-data-dir=${e2eUserDataDir}`],
@@ -67,6 +86,7 @@ describeE2e('mcp-browser e2e', () => {
     }
     await page.close()
     await electronApp.close()
+    await closeMcpStub?.()
     fs.rmSync(e2eUserDataDir, { recursive: true, force: true })
   })
 
@@ -76,19 +96,25 @@ describeE2e('mcp-browser e2e', () => {
   })
 
   test(
-    '连接官方 Debug MCP 示例端点并拉取 tools/list',
+    useOfficialDemo
+      ? '连接官方 Debug MCP 示例端点并拉取 tools/list'
+      : '连接本地 MCP 桩并拉取 tools/list',
     async () => {
       await page.getByRole('button', { name: /添加端点/ }).click()
-      await page.getByPlaceholder('示例：本地 MCP 服务').fill(DEMO_MCP_DISPLAY_NAME)
-      await page.getByPlaceholder('https://example.com/mcp').fill(DEMO_MCP_HTTP_URL)
+      await page.getByPlaceholder('示例：本地 MCP 服务').fill(mcpDisplayNameForTest)
+      await page.getByPlaceholder('https://example.com/mcp').fill(mcpHttpUrlForTest)
       await page.getByRole('button', { name: '保存' }).click()
       const header = page.getByTestId('mcp-tools-header')
       await header.waitFor({ state: 'visible', timeout: 15_000 })
-      await expect((await header.textContent())?.trim()).toContain(DEMO_MCP_DISPLAY_NAME)
-      await page.getByText('已连接').waitFor({ state: 'visible', timeout: 120_000 })
+      await expect((await header.textContent())?.trim()).toContain(mcpDisplayNameForTest)
+      const connectTimeout = useOfficialDemo ? 120_000 : 30_000
+      // Streamable HTTP 成功为「列表正常」；SSE 就绪为「已连接」；英文界面为 List OK
+      await page
+        .getByText(/列表正常|已连接|List OK/)
+        .waitFor({ state: 'visible', timeout: connectTimeout })
       await page.getByText(/\d+\s*个\s*工具/).waitFor({ state: 'visible', timeout: 15_000 })
     },
-    150_000,
+    useOfficialDemo ? 150_000 : 60_000,
   )
 
   test('主窗口截图：工具列表 + 选中工具详情', async () => {

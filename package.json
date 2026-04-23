@@ -27,13 +27,13 @@
     "rebuild": "pnpm clean && pnpm dist",
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:test": "vite build --mode=test",
     "dist": "pnpm run build && node scripts/gen-icon-ico.mjs && electron-builder --publish never",
     "dist:dir": "pnpm run build && node scripts/gen-icon-ico.mjs && electron-builder --dir --publish never",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "pretest": "vite build --mode=test",
-    "test": "vitest run --exclude test/e2e.spec.ts",
-    "test:e2e": "vitest run test/e2e.spec.ts",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:update-screenshots": "node scripts/test-update-screenshots.mjs"
   },
   "dependencies": {

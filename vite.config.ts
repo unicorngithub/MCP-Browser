@@ -7,10 +7,10 @@ import pkg from './package.json'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
-  rmSync('dist-electron', { recursive: true, force: true })
-
   const isServe = command === 'serve'
   const isBuild = command === 'build'
+  /** 仅正式 build 时清空，避免 Vitest / IDE 反复加载配置时整目录 rmSync；开发见 stale 用 `pnpm clean`。 */
+  if (isBuild) rmSync('dist-electron', { recursive: true, force: true })
   const sourcemap = isServe || !!process.env.VSCODE_DEBUG
 
   return {

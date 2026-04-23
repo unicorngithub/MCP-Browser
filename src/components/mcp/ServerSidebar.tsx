@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useShallow } from 'zustand/react/shallow'
 import type { MCPServer } from '@shared/types'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import UpdateModal from '@/components/update/Modal'
@@ -15,7 +16,14 @@ interface ServerSidebarProps {
 export function ServerSidebar({ onAdd, onEdit }: ServerSidebarProps) {
   const { t } = useTranslation()
   const workspaceId = useWorkspaceId()
-  const { servers, removeServer, reorderServers, ready } = useAddressStore()
+  const { servers, removeServer, reorderServers, ready } = useAddressStore(
+    useShallow((s) => ({
+      servers: s.servers,
+      ready: s.ready,
+      removeServer: s.removeServer,
+      reorderServers: s.reorderServers,
+    })),
+  )
   const selectedId = useWorkspaceUiStore((s) => s.selectedServerByWs[workspaceId] ?? null)
   const select = useCallback(
     (id: string | null) => {

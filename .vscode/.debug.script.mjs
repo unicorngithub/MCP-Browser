@@ -11,13 +11,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const envContent = Object.entries(pkg.debug.env).map(([key, val]) => `${key}=${val}`)
 fs.writeFileSync(path.join(__dirname, '.debug.env'), envContent.join('\n'))
 
-// bootstrap
-spawn(
-  // TODO: terminate `npm run dev` when Debug exits.
+const child = spawn(
   process.platform === 'win32' ? 'npm.cmd' : 'npm',
   ['run', 'dev'],
   {
     stdio: 'inherit',
-    env: Object.assign(process.env, { VSCODE_DEBUG: 'true' }),
+    env: { ...process.env, VSCODE_DEBUG: 'true' },
   },
 )
+
+function shutdownChild() {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  try {
+    child.kill()
+  } catch {
+    /* ignore */
+  }
+}
+
+/** VS Code 结束调试/终止 Background Task 时常发 SIGTERM；转发给 Vite 子进程，避免残留。 */
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, shutdownChild)
+}
+if (process.platform !== 'win32') {
+  process.on('SIGHUP', shutdownChild)
+}
+
+child.on('exit', (code, signal) => {
+  if (signal) process.exit(1)
+  process.exit(code ?? 0)
+})

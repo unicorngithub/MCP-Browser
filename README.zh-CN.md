@@ -121,7 +121,8 @@ sudo xattr -r -d com.apple.quarantine ~/Applications/MCP\ Browser.app
 | `pnpm run dist:dir` | 先 `pnpm build`，再 `electron-builder --dir`（仅解包目录） |
 | `pnpm clean` | 删除 `dist/`、`dist-electron/`、`release/`、`node_modules/.vite` |
 | `pnpm rebuild` | `clean` 后 `dist` |
-| `pnpm test` | Vitest（E2E 需外网；Linux 跳过；**不**覆盖 README 配图） |
+| `pnpm test` | Vitest 单元测试（不含 `test/e2e.spec.ts`） |
+| `pnpm test:e2e` | Playwright + Electron E2E；**默认本机 MCP 桩**、无需外网；`MCP_BROWSER_E2E_USE_OFFICIAL=1` 时连官方示例；`MCP_BROWSER_SKIP_E2E=1` 跳过 |
 | `pnpm test:update-screenshots` | 刷新 `docs/images/*.png` 等 |
 | `pnpm preview` | 预览 Vite 构建后的渲染进程 |
 

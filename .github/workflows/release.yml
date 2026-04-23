@@ -44,10 +44,10 @@ jobs:
         run: pnpm typecheck
 
       - name: Test build
-        run: pnpm run pretest
+        run: pnpm run build:test
 
       - name: Vitest (unit)
-        run: pnpm exec vitest run --exclude test/e2e.spec.ts
+        run: pnpm test
 
       - name: Package
         run: pnpm dist

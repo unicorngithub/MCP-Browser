@@ -121,7 +121,8 @@ If it still won’t open, use **System Settings → Privacy & Security** to allo
 | `pnpm run dist:dir` | `pnpm build` then `electron-builder --dir` (unpacked app only) |
 | `pnpm clean` | Remove `dist/`, `dist-electron/`, `release/`, `node_modules/.vite` |
 | `pnpm rebuild` | `pnpm clean` then `pnpm dist` |
-| `pnpm test` | Vitest (E2E uses the official Debug MCP HTTP demo; needs network, skipped on Linux; does **not** overwrite README screenshots) |
+| `pnpm test` | Vitest unit tests (`test/e2e.spec.ts` excluded) |
+| `pnpm test:e2e` | Playwright + Electron E2E; **local MCP stub by default** (no outbound network). `MCP_BROWSER_E2E_USE_OFFICIAL=1` uses the official demo URL. `MCP_BROWSER_SKIP_E2E=1` skips. |
 | `pnpm test:update-screenshots` | Sets `MCP_BROWSER_UPDATE_SCREENSHOTS=1` to refresh `docs/images/*.png` and `test/screenshots/e2e.png` |
 | `pnpm preview` | Vite preview of the renderer build |
 
