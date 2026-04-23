@@ -3,6 +3,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   type CSSProperties,
   type ReactNode,
 } from 'react'
@@ -30,6 +31,14 @@ import {
 import { formatToolCallResponseTabText } from '@/lib/mcpHttpResponseBodyDisplay'
 import { expandMcpToolResultForPreview, safeJsonStringify } from '@/lib/mcpToolResultPreview'
 import { McpJsonPreview } from '@/components/mcp/McpJsonPreview'
+
+const BENCH_MAX = 500
+
+function percentileMs(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0
+  const idx = Math.ceil((p / 100) * sorted.length) - 1
+  return Math.round(sorted[Math.max(0, idx)])
+}
 
 /** 主工具栏「HTTP 传输」与侧栏工具列表「匹配字段」下拉共用样式 */
 const MCP_PANEL_SELECT_CLASS =
@@ -247,6 +256,23 @@ export function ToolsPanel() {
   const [connectHttpDetailOpen, setConnectHttpDetailOpen] = useState(false)
   const [inputSchemaOpen, setInputSchemaOpen] = useState(true)
   const [toolTestOpen, setToolTestOpen] = useState(true)
+  const [benchPanelOpen, setBenchPanelOpen] = useState(false)
+  const benchAbortRef = useRef(false)
+  const [benchIterations, setBenchIterations] = useState(30)
+  const [benchConcurrency, setBenchConcurrency] = useState(1)
+  const [benchRunning, setBenchRunning] = useState(false)
+  const [benchDone, setBenchDone] = useState(0)
+  const [benchStats, setBenchStats] = useState<{
+    ok: number
+    fail: number
+    aborted: boolean
+    wallMs: number
+    minMs: number
+    maxMs: number
+    p50Ms: number
+    p95Ms: number
+    avgMs: number
+  } | null>(null)
   const [toolListQuery, setToolListQuery] = useState('')
   const [toolListSearchField, setToolListSearchField] = useState<'name' | 'description' | 'both'>(
     'name',
@@ -277,6 +303,11 @@ export function ToolsPanel() {
     setHttpDetailOpen(false)
     setInputSchemaOpen(true)
     setToolTestOpen(true)
+    setBenchPanelOpen(false)
+    benchAbortRef.current = true
+    setBenchRunning(false)
+    setBenchDone(0)
+    setBenchStats(null)
   }, [selectedToolName, schemaFields])
 
   useEffect(() => {
@@ -322,29 +353,33 @@ export function ToolsPanel() {
     setFormValues((prev) => ({ ...prev, [key]: value }))
   }, [])
 
-  const runToolTest = useCallback(async () => {
-    if (!selected?.url || !selectedTool) return
-    let args: Record<string, unknown>
+  /** 解析当前工具调用参数；失败时已写入 argsParseError，返回 null */
+  const resolveCurrentToolArgs = useCallback((): Record<string, unknown> | null => {
     if (argsMode === 'form' && schemaFields.length > 0) {
       const built = buildArgumentsFromForm(schemaFields, formValues)
       if (!built.ok) {
         setArgsParseError(t(`tools.formErrors.${built.error.kind}`, { field: built.error.field }))
-        return
+        return null
       }
-      args = built.args
-    } else {
-      try {
-        const parsed: unknown = JSON.parse(toolArgsJson || '{}')
-        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          setArgsParseError(t('tools.argsRootObject'))
-          return
-        }
-        args = parsed as Record<string, unknown>
-      } catch {
-        setArgsParseError(t('tools.argsInvalidJson'))
-        return
-      }
+      return built.args
     }
+    try {
+      const parsed: unknown = JSON.parse(toolArgsJson || '{}')
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        setArgsParseError(t('tools.argsRootObject'))
+        return null
+      }
+      return parsed as Record<string, unknown>
+    } catch {
+      setArgsParseError(t('tools.argsInvalidJson'))
+      return null
+    }
+  }, [argsMode, schemaFields, formValues, toolArgsJson, t])
+
+  const runToolTest = useCallback(async () => {
+    if (!selected?.url || !selectedTool) return
+    const args = resolveCurrentToolArgs()
+    if (args === null) return
     setArgsParseError(null)
     setCallError(null)
     setCallErrorI18n(null)
@@ -391,11 +426,86 @@ export function ToolsPanel() {
     mcpHttpTransport,
     setSseLinkState,
     selectedTool,
-    toolArgsJson,
-    argsMode,
-    schemaFields,
-    formValues,
-    t,
+    resolveCurrentToolArgs,
+  ])
+
+  const stopToolBench = useCallback(() => {
+    benchAbortRef.current = true
+  }, [])
+
+  const runToolBench = useCallback(async () => {
+    if (!selected?.url || !selectedTool || benchRunning) return
+    const args = resolveCurrentToolArgs()
+    if (args === null) return
+    const total = Math.min(BENCH_MAX, Math.max(1, Math.floor(Number(benchIterations)) || 1))
+    setBenchIterations(total)
+    const conc = Math.min(BENCH_MAX, Math.max(1, Math.floor(Number(benchConcurrency)) || 1))
+    setBenchConcurrency(conc)
+    benchAbortRef.current = false
+    setBenchRunning(true)
+    setBenchStats(null)
+    setBenchDone(0)
+    const latencies: number[] = []
+    let ok = 0
+    let fail = 0
+    const wall0 = performance.now()
+    try {
+      let nextTask = 0
+      const worker = async (): Promise<void> => {
+        while (true) {
+          if (benchAbortRef.current) return
+          const i = nextTask++
+          if (i >= total) return
+          const t1 = performance.now()
+          try {
+            const out = await window.mcpDesktop.callTool(
+              selected.url,
+              selectedTool.name,
+              args,
+              selected.headers,
+              reuseMcpSessionEffective,
+              mcpHttpTransport,
+            )
+            const ms = performance.now() - t1
+            latencies.push(ms)
+            if (out.ok) ok++
+            else fail++
+          } catch {
+            fail++
+          }
+          setBenchDone((d) => d + 1)
+        }
+      }
+      const poolSize = Math.min(conc, total)
+      await Promise.all(Array.from({ length: poolSize }, () => worker()))
+    } finally {
+      const wallMs = Math.round(performance.now() - wall0)
+      latencies.sort((a, b) => a - b)
+      const sum = latencies.reduce((a, b) => a + b, 0)
+      const avgMs = latencies.length ? Math.round(sum / latencies.length) : 0
+      setBenchStats({
+        ok,
+        fail,
+        aborted: benchAbortRef.current,
+        wallMs,
+        minMs: latencies.length ? Math.round(latencies[0]) : 0,
+        maxMs: latencies.length ? Math.round(latencies[latencies.length - 1]) : 0,
+        p50Ms: percentileMs(latencies, 50),
+        p95Ms: percentileMs(latencies, 95),
+        avgMs,
+      })
+      setBenchRunning(false)
+    }
+  }, [
+    selected?.url,
+    selected?.headers,
+    selectedTool,
+    benchRunning,
+    benchIterations,
+    benchConcurrency,
+    reuseMcpSessionEffective,
+    mcpHttpTransport,
+    resolveCurrentToolArgs,
   ])
 
   const statusLabel =
@@ -1029,7 +1139,7 @@ export function ToolsPanel() {
                   <button
                     type="button"
                     onClick={() => void runToolTest()}
-                    disabled={callLoading || connection !== 'ok' || !selected?.url}
+                    disabled={callLoading || benchRunning || connection !== 'ok' || !selected?.url}
                     className="inline-flex items-center gap-2 rounded-lg border border-teal-600/40 bg-gradient-to-b from-teal-100/90 to-emerald-50/80 px-3 py-2 text-xs font-semibold text-teal-900 transition hover:border-teal-500/50 hover:from-teal-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-teal-500/35 dark:from-teal-500/15 dark:to-emerald-500/10 dark:text-teal-100 dark:hover:border-teal-400/45 dark:hover:from-teal-500/25"
                   >
                     {callLoading ? (
@@ -1145,6 +1255,150 @@ export function ToolsPanel() {
                       </div>
                     </div>
                   ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-zinc-200/90 bg-white/60 dark:border-white/[0.06] dark:bg-zinc-950/30">
+                  <button
+                    type="button"
+                    onClick={() => setBenchPanelOpen((o) => !o)}
+                    aria-expanded={benchPanelOpen}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition hover:text-zinc-800 dark:hover:text-zinc-300 sm:px-5"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden
+                      className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform duration-200 ${
+                        benchPanelOpen ? 'rotate-90' : ''
+                      }`}
+                    >
+                      <path d="M6 4l4 4-4 4V4z" />
+                    </svg>
+                    <span className="h-px w-6 shrink-0 bg-zinc-300 dark:bg-zinc-700" aria-hidden />
+                    <span className="text-[11px] font-semibold normal-case tracking-wide text-zinc-500">
+                      {t('tools.benchSection')}
+                    </span>
+                    <span className="text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-600">
+                      {benchPanelOpen ? t('tools.schemaToggleCollapse') : t('tools.schemaToggleExpand')}
+                    </span>
+                  </button>
+                  {benchPanelOpen ? (
+                    <div className="border-t border-zinc-200/80 px-4 pb-4 pt-3 dark:border-white/[0.04] sm:px-5">
+                      <p className="mb-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                        {t('tools.benchTitle')}
+                      </p>
+                      <p className="mb-3 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-600">
+                        {t('tools.benchHint', { max: BENCH_MAX })}
+                      </p>
+                      <div className="flex flex-wrap items-end gap-3">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                            {t('tools.benchCountLabel')}
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={BENCH_MAX}
+                            value={benchIterations}
+                            onChange={(e) => {
+                              const v = Number.parseInt(e.target.value, 10)
+                              if (Number.isNaN(v)) setBenchIterations(1)
+                              else setBenchIterations(Math.min(BENCH_MAX, Math.max(1, v)))
+                            }}
+                            disabled={benchRunning || callLoading || connection !== 'ok' || !selected?.url}
+                            className="w-24 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 font-mono text-xs text-zinc-900 outline-none focus:border-cyan-500/50 dark:border-white/[0.08] dark:bg-zinc-900/80 dark:text-zinc-200"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                            {t('tools.benchConcurrencyLabel')}
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={BENCH_MAX}
+                            value={benchConcurrency}
+                            onChange={(e) => {
+                              const v = Number.parseInt(e.target.value, 10)
+                              if (Number.isNaN(v)) setBenchConcurrency(1)
+                              else {
+                                setBenchConcurrency(Math.min(BENCH_MAX, Math.max(1, v)))
+                              }
+                            }}
+                            disabled={benchRunning || callLoading || connection !== 'ok' || !selected?.url}
+                            title={t('tools.benchConcurrencyTitle', { max: BENCH_MAX })}
+                            aria-label={t('tools.benchConcurrencyTitle', { max: BENCH_MAX })}
+                            className="w-24 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 font-mono text-xs text-zinc-900 outline-none focus:border-cyan-500/50 dark:border-white/[0.08] dark:bg-zinc-900/80 dark:text-zinc-200"
+                          />
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void runToolBench()}
+                            disabled={
+                              benchRunning ||
+                              callLoading ||
+                              connection !== 'ok' ||
+                              !selected?.url ||
+                              !selectedTool
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg border border-zinc-400/50 bg-zinc-100/90 px-3 py-2 text-xs font-semibold text-zinc-800 transition hover:border-zinc-500 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-zinc-600/60 dark:bg-zinc-800/80 dark:text-zinc-200 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+                          >
+                            {benchRunning ? (
+                              <>
+                                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-500/40 border-t-zinc-700 dark:border-zinc-400/30 dark:border-t-zinc-200" />
+                                {t('tools.benchRunning')}
+                              </>
+                            ) : (
+                              t('tools.benchRun')
+                            )}
+                          </button>
+                          {benchRunning ? (
+                            <button
+                              type="button"
+                              onClick={stopToolBench}
+                              className="rounded-lg border border-red-400/50 bg-red-50/90 px-3 py-2 text-xs font-semibold text-red-900 transition hover:bg-red-100 dark:border-red-500/35 dark:bg-red-950/50 dark:text-red-100 dark:hover:bg-red-950/70"
+                            >
+                              {t('tools.benchStop')}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      {benchRunning || benchDone > 0 ? (
+                        <p className="mt-2 font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                          {t('tools.benchProgress', {
+                            done: benchDone,
+                            total: Math.min(BENCH_MAX, Math.max(1, benchIterations)),
+                          })}
+                        </p>
+                      ) : null}
+                      {benchStats ? (
+                        <div className="mt-2 rounded-lg border border-zinc-200/90 bg-zinc-50/90 p-3 text-[11px] leading-relaxed text-zinc-800 dark:border-white/[0.06] dark:bg-zinc-900/50 dark:text-zinc-200">
+                          {benchStats.aborted ? (
+                            <p className="mb-1 font-medium text-amber-800 dark:text-amber-200/90">
+                              {t('tools.benchAborted')}
+                            </p>
+                          ) : null}
+                          <p className="font-mono">
+                            {t('tools.benchResultWall', {
+                              ms: benchStats.wallMs,
+                              ok: benchStats.ok,
+                              fail: benchStats.fail,
+                            })}
+                          </p>
+                          <p className="mt-1 font-mono">
+                            {t('tools.benchResultLatency', {
+                              min: benchStats.minMs,
+                              p50: benchStats.p50Ms,
+                              p95: benchStats.p95Ms,
+                              max: benchStats.maxMs,
+                              avg: benchStats.avgMs,
+                            })}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
