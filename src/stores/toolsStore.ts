@@ -116,7 +116,7 @@ function buildToolsState(
           error: null,
           errorI18n: null,
           connectDiagnostics: null,
-          connectHttpTrace: null,
+          connectHttpTrace: result.httpTrace ?? null,
           sseLinkState:
             httpTransport === 'sse' ? (result.sseHeld ? 'ready' : 'off') : 'off',
         })

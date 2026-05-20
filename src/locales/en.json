@@ -169,6 +169,8 @@
     "httpResponseStatus": "HTTP status",
     "httpResponseHeaders": "Response headers",
     "httpResponseBody": "Response body",
+    "httpBodyRaw": "Raw",
+    "httpBodyPretty": "Pretty",
     "httpNoResponse": "No HTTP response (e.g. network error or timeout). The request below is what was sent.",
     "diagTitle": "Connection diagnostics",
     "diagFailStep": "Failed stage",

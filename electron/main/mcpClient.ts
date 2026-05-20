@@ -683,6 +683,15 @@ async function attemptSseToolsListWithHeld(
       ok: true,
       tools: normalizeTools(listRead.result),
       sseHeld: true,
+      httpTrace: {
+        request: listReqTrace,
+        response: {
+          status: listRead.status,
+          statusText: '',
+          headersText: '',
+          body: listRead.raw,
+        },
+      },
     }
   } catch {
     disposeHeldSse(sseKey)
@@ -812,7 +821,20 @@ async function fetchMcpToolsListSse(
     })
     legacySse = null
 
-    return { ok: true, tools, sseHeld: true }
+    return {
+      ok: true,
+      tools,
+      sseHeld: true,
+      httpTrace: {
+        request: listReqTrace,
+        response: {
+          status: listRead.status,
+          statusText: '',
+          headersText: '',
+          body: listRead.raw,
+        },
+      },
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return {
@@ -1041,7 +1063,19 @@ export async function fetchMcpToolsList(
 
       const tools = normalizeTools(listRead.result)
       if (reuseSession) touchCachedSession(cacheKey)
-      return { ok: true, tools }
+      return {
+        ok: true,
+        tools,
+        httpTrace: {
+          request: listReqTrace,
+          response: {
+            status: listRead.status,
+            statusText: '',
+            headersText: '',
+            body: listRead.raw,
+          },
+        },
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       if (reuseSession) invalidateMcpSessionCacheKey(cacheKey)

@@ -98,7 +98,14 @@ export interface McpToolCallHttpTrace {
 }
 
 export type FetchToolsResult =
-  | { ok: true; tools: MCPTool[]; /** HTTP/SSE：主进程已保持同一条 SSE，后续 tools/call 复用 */ sseHeld?: boolean }
+  | {
+      ok: true
+      tools: MCPTool[]
+      /** HTTP/SSE：主进程已保持同一条 SSE，后续 tools/call 复用 */
+      sseHeld?: boolean
+      /** tools/list 成功时的 HTTP 请求/响应原文，便于 UI 展示「查看实际请求」 */
+      httpTrace?: McpToolCallHttpTrace
+    }
   | {
       ok: false
       error: string

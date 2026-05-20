@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import type { McpToolCallHttpTrace } from '@shared/types'
 import { useTranslation } from 'react-i18next'
 import UpdateModal from '@/components/update/Modal'
@@ -12,11 +13,42 @@ type Props = {
   onClose: () => void
 }
 
+/** 美化响应体：纯 JSON 直接 parse 后缩进；SSE 流则逐行美化 `data: {...}`。失败保留原文。 */
+function prettifyHttpBody(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return raw
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2)
+  } catch {}
+  if (!raw.includes('data:')) return raw
+  const out: string[] = []
+  let changed = false
+  for (const line of raw.split('\n')) {
+    const m = line.match(/^(\s*data:\s*)(.*)$/)
+    if (m && m[2].trim()) {
+      try {
+        const pretty = JSON.stringify(JSON.parse(m[2]), null, 2)
+        out.push(m[1] + pretty.replace(/\n/g, '\n' + ' '.repeat(m[1].length)))
+        changed = true
+        continue
+      } catch {}
+    }
+    out.push(line)
+  }
+  return changed ? out.join('\n') : raw
+}
+
 export function ToolCallHttpDetailModal({ open, trace, onClose }: Props) {
   const { t } = useTranslation()
   const close = t('update.close')
   const req = trace?.request
   const res = trace?.response
+  const [pretty, setPretty] = useState(false)
+
+  const responseBodyDisplay = useMemo(() => {
+    if (!res?.body) return ''
+    return pretty ? prettifyHttpBody(res.body) : res.body
+  }, [res?.body, pretty])
 
   return (
     <UpdateModal
@@ -78,11 +110,44 @@ export function ToolCallHttpDetailModal({ open, trace, onClose }: Props) {
                 <pre className={`${HTTP_TRACE_PRE} mb-3`}>
                   {res.headersText || '—'}
                 </pre>
-                <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-600">
-                  {t('tools.httpResponseBody')}
+                <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-600">
+                  <span>{t('tools.httpResponseBody')}</span>
+                  {res.body
+                    ? (
+                      <div
+                        className="inline-flex shrink-0 items-center overflow-hidden rounded-md border border-zinc-300 bg-white text-[10px] font-medium tracking-normal dark:border-white/[0.08] dark:bg-zinc-900/70"
+                        role="group"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPretty(false)}
+                          aria-pressed={!pretty}
+                          className={`px-2 py-0.5 transition ${
+                            !pretty
+                              ? 'bg-cyan-500/15 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200/95'
+                              : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          {t('tools.httpBodyRaw')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPretty(true)}
+                          aria-pressed={pretty}
+                          className={`px-2 py-0.5 transition ${
+                            pretty
+                              ? 'bg-cyan-500/15 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200/95'
+                              : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          {t('tools.httpBodyPretty')}
+                        </button>
+                      </div>
+                    )
+                    : null}
                 </div>
                 <pre className={HTTP_TRACE_PRE}>
-                  {res.body || '—'}
+                  {responseBodyDisplay || '—'}
                 </pre>
               </>
             )

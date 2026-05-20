@@ -644,6 +644,13 @@ export function ToolsPanel() {
                   {toolListQuery.trim() ? `${filteredTools.length}/${tools.length}` : tools.length}
                 </span>
               ) : null}
+              {connection === 'ok' && connectHttpTrace ? (
+                <HttpTraceDetailIconButton
+                  variant="neutral"
+                  onClick={() => setConnectHttpDetailOpen(true)}
+                  label={t('tools.viewConnectionHttpRequest')}
+                />
+              ) : null}
               <span className="min-w-0 flex-1" aria-hidden />
               {selected && mcpHttpTransport !== 'sse' ? (
                 <span

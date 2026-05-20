@@ -169,6 +169,8 @@
     "httpResponseStatus": "HTTP 状态",
     "httpResponseHeaders": "响应头",
     "httpResponseBody": "响应体",
+    "httpBodyRaw": "原始",
+    "httpBodyPretty": "美化",
     "httpNoResponse": "未收到 HTTP 响应（例如网络错误或超时）。下方为已发出的请求内容。",
     "diagTitle": "连接诊断",
     "diagFailStep": "失败阶段",
